@@ -13,8 +13,15 @@ module Procfs
 		attr_reader :pids
 		def initialize
 			@pids = []
-			get_pids({:users=>[]})
+		end
 
+		def getuseruid(user)
+			begin
+				return Etc.getpwnam(user).uid
+			rescue => e
+				@@logger.warn e.to_s
+			end
+			nil
 		end
 
 		##
@@ -30,9 +37,8 @@ module Procfs
 			end
 			uids = []
 			users.each { |user|
-				uid = Etc.getpwnam(user).uid
-				uids << uid.to_i
-
+					uid = getuseruid(user)
+					uids << uid unless uid.nil?
 			}
 			uids
 		end
@@ -45,10 +51,13 @@ module Procfs
 			@pid_status = {}
 			piddirs.each { |piddir|
 				pid=File.basename(piddir)
+				dstat = File.lstat(piddir)
+				next if !uids.empty? && !uids.include?(dstat.uid)
 				@pids << pid
-				@pid_status[pid]=Procfs::Status.new(pid)
+				pid_status=Procfs::Status.new(pid)
+				@pid_status[pid] = pid_status
 
-				@@logger.debug "pid=#{pid} status=#{@pid_status[pid].fields[:vmdata]}"
+				@@logger.debug "pid=#{pid} uid=#{pid_status.fields[:uid]} vmdata=#{pid_status.fields[:vmdata]}"
 			}
 
 		end

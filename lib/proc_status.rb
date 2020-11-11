@@ -41,7 +41,8 @@ module Procfs
 		def initialize(pid)
 			@pid = pid
 			@status=File.read(File.join("/proc", @pid, "status"))
-			@fields=parse_status(@status)
+			@fields={}
+			parse_status(@status)
 		end
 
 		def symbolize(name)
@@ -49,13 +50,15 @@ module Procfs
 		end
 
 		def parse_status(status)
-			fields={}
+			@fields ||= {}
 			status.split(/\n/).each { |line|
-				m=line.match(/(?<name>[^:]+)[:]\s+(?<value>.*)/)
+				m=line.match(/(?<name>[^:]+)[:]\s+(?<value>.*?)(?<kbytes>\skB)?$/)
 				name=symbolize(m[:name])
-				fields[name] = m[:value]
+				value=m[:value]
+				value=value.to_i*1024 unless m[:kbytes].nil?
+				@fields[name] = value
 			}
-			fields
+			@fields
 		end
 	end
 end
