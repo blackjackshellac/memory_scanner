@@ -3,49 +3,55 @@
 require 'etc'
 require_relative 'proc_status'
 
-class ProcStatusScanner
+module Procfs
+	class Scanner
 
-	##
-	# Get a list of uids for the list of users
-	#
-	# @param [Array] users list of users or empty for current user, or all users
-	# for user root
-	def get_uids(users)
-		if users.empty?
+		def self.init(opts={:logger=>logger})
+			@@logger = opts[:logger]
 		end
-		users.each { |user|
-			uid = get_userid(user)
-			
-		}
+
+		attr_reader :pids
+		def initialize
+			@pids = []
+			get_pids({:users=>[]})
+
+		end
+
+		##
+		# Get a list of uids for the list of users
+		#
+		# @param [Array] users list of users or empty for current user, or all users
+		# for user root
+		def get_uids(users)
+			if users.nil? || users.empty?
+				users ||= []
+				curuser = Etc.getlogin
+				users << curuser unless curuser.eql?("root")
+			end
+			uids = []
+			users.each { |user|
+				uid = Etc.getpwnam(user).uid
+				uids << uid.to_i
+
+			}
+			uids
+		end
+
+		def get_pids(opts={:users=>[]})
+
+			uids = get_uids(opts[:users])
+			piddirs=Dir.glob("/proc/[0-9]*")
+
+			@pid_status = {}
+			piddirs.each { |piddir|
+				pid=File.basename(piddir)
+				@pids << pid
+				@pid_status[pid]=Procfs::Status.new(pid)
+
+				@@logger.debug "pid=#{pid} status=#{@pid_status[pid].fields[:vmdata]}"
+			}
+
+		end
+
 	end
-
-	def get_pids(opts={:users=>[]})
-
-		 uid = get_useruid(user)
-		 pids=Dir.glob("/proc/[0-9]*")
-
-		 pids.each { |pid|
-			  unless uid.nil?
-					dstat=lstat(pid)
-					next if dstat.nil? || dstat.uid != uid
-			  end
-			  pid_cmdline=File.join(pid, "cmdline")
-			  cmdline=File.read(pid_cmdline).strip
-			  # cmdline and options are split by EOS character
-			  chunks=cmdline.split(/\0/)
-			  chunks.each { |chunk|
-					next if chunk[regexp].nil?
-					ipid = File.basename(pid).to_i
-					if ipid == Process.pid
-						 $log.debug "Don't kill yourself, ignoring pid=#{ipid}"
-						 next
-					end
-					$log.debug "#{uid}.#{pid}>> [#{process_name} in #{chunks.inspect}]"
-					ipids << ipid
-					return ipids if oneshot
-			  }
-		 }
-		 ipids
-	end
-
 end

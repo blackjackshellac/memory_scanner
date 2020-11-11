@@ -12,57 +12,56 @@ require 'optparse'
 #
 # @author blackjackshellac
 #
-class MemoryScanner
+module Memory
+	include Procfs
 
-	# @attr_reader [Logger] logger - instance of logger
-	attr_reader :logger
-	def initialize
-		@logger = Logger.create(STDERR, Logger::INFO)
-	end
+	class ScannerMain
+		## Process name with extension
+      MERB=File.basename($0)
+      ## Process name without .rb extension
+      ME=File.basename($0, ".rb")
+      # Directory where the script lives, resolves symlinks
+      MD=File.expand_path(File.dirname(File.realpath($0)))
 
-	# $ cd /proc/[pid]
-	# $ cat status
-	# Name:	Web Content
-	# Umask:	0022
-	# State:	S (sleeping)
-	# Tgid:	377820
-	# Ngid:	0
-	# Pid:	377820
-	# PPid:	377642
-	# TracerPid:	0
-	# Uid:	1201	1201	1201	1201
-	# Gid:	1201	1201	1201	1201
-	# FDSize:	128
-	# Groups:	10 494 496 497 501 1201 1205
-	# NStgid:	377820
-	# NSpid:	377820
-	# NSpgid:	3035
-	# NSsid:	3035
-	# VmPeak:	 3425508 kB
-	# VmSize:	 3321700 kB
-	# VmLck:	       0 kB
-	# VmPin:	       0 kB
-	# VmHWM:	  754624 kB
-	# VmRSS:	  452668 kB
-	# RssAnon:	  342052 kB
-	# RssFile:	   95612 kB
-	# RssShmem:	   15004 kB
-	# VmData:	  617768 kB
-	# VmStk:	     252 kB
-	# VmExe:	     400 kB
-	# VmLib:	  139648 kB
-	# VmPTE:	    3048 kB
-	# VmSwap:	       0 kB
+		# @attr_reader [Logger] logger - instance of logger
+		attr_reader :logger
+		def initialize
+			@logger = Logger.create(STDERR, Logger::INFO)
+			Procfs::Scanner.init({:logger=>@logger})
+		end
 
-	def scan
-		return 0
-	rescue => e
-		@logger.error "memory scan failed: #{e.message}"
-		puts e.backtrace.join("\n")
-		return 1
+		def parse_clargs
+			optparser=OptionParser.new { |opts|
+				opts.banner = "#{MERB} [options]\n"
+
+				opts.on('-D', '--debug', "Enable debugging output") {
+					@logger.level = Logger::DEBUG
+				}
+
+				opts.on('-h', '--help', "Help") {
+					$stdout.puts ""
+					$stdout.puts opts
+					exit 0
+				}
+
+			}
+			optparser.parse!
+
+		end
+
+		def scan
+			@logger.debug "Scanning system at #{Time.now}"
+			ps = Procfs::Scanner.new
+			return 0
+		rescue => e
+			@logger.error "memory scan failed: #{e.message}"
+			puts e.backtrace.join("\n")
+			return 1
+		end
 	end
 end
 
-ms = MemoryScanner.new
+ms = Memory::ScannerMain.new
+ms.parse_clargs
 ev = ms.scan
 exit ev
