@@ -1,11 +1,9 @@
-#
-#
 
 require_relative 'proc_common'
 
 module Procfs
 	# $ cd /proc/[pid]
-	# $ cat status
+	# $ cat meminfo
 	# Name:	Web Content
 	# Umask:	0022
 	# State:	S (sleeping)
@@ -38,13 +36,11 @@ module Procfs
 	# VmPTE:	    3048 kB
 	# VmSwap:	       0 kB
 
-	class Status
-		attr_reader :pid, :status, :fields
-		def initialize(pid)
-			@pid = pid
-			@status=File.read(File.join("/proc", @pid, "status"))
-			@fields = Procfs::Common.parse_name_value(@status)
+	class Meminfo
+		attr_reader :meminfo, :fields
+		def initialize
+			@meminfo=File.read(File.join("/proc", "meminfo"))
+			@fields = Procfs::Common.parse_name_value(@meminfo)
 		end
-
 	end
 end

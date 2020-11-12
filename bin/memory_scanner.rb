@@ -52,7 +52,7 @@ module Memory
 		def scan
 			@logger.debug "Scanning system at #{Time.now}"
 			ps = Procfs::Scanner.new
-			ps.get_pids(:users=>["steeve", "root", "lissa", "foobarbaz"])
+			ps.get_pids(:users=>["steeve", "lissa", "foobarbaz"])
 			return 0
 		rescue => e
 			@logger.error "memory scan failed: #{e.message}"

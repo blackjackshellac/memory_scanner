@@ -2,6 +2,7 @@
 
 require 'etc'
 require_relative 'proc_status'
+require_relative 'proc_meminfo'
 
 module Procfs
 	class Scanner
@@ -10,9 +11,11 @@ module Procfs
 			@@logger = opts[:logger]
 		end
 
-		attr_reader :pids
+		attr_reader :pids, :meminfo
 		def initialize
 			@pids = []
+			@meminfo = Procfs::Meminfo.new
+			@@logger.debug @meminfo.inspect
 		end
 
 		def getuseruid(user)
@@ -43,6 +46,16 @@ module Procfs
 			uids
 		end
 
+		##
+		# @param [Integer] uid uid to search for in list
+		# @param [Array] uids list of uids, or empty list to match all uid
+		#
+		# @return [Boolean] true if uids is empty or uid is in list
+		def uid_in_uids?(uid, uids)
+			# an empty uids list is all uids
+			uids.empty? || uids.include?(uid)
+		end
+
 		def get_pids(opts={:users=>[]})
 
 			uids = get_uids(opts[:users])
@@ -52,7 +65,7 @@ module Procfs
 			piddirs.each { |piddir|
 				pid=File.basename(piddir)
 				dstat = File.lstat(piddir)
-				next if !uids.empty? && !uids.include?(dstat.uid)
+				next unless uid_in_uids?(dstat.uid, uids)
 				@pids << pid
 				pid_status=Procfs::Status.new(pid)
 				@pid_status[pid] = pid_status
