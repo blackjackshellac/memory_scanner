@@ -39,12 +39,15 @@ module Procfs
 	# VmSwap:	       0 kB
 
 	class Status
-		attr_reader :pid, :status, :fields
+		attr_reader :pid, :status, :fields, :children
 		attr_reader :name, :ppid, :vmsize
+		attr_accessor :parent
 		def initialize(pid)
 			@pid = pid
 			@status=File.read(File.join("/proc", @pid, "status"))
 			@fields = Procfs::Common.parse_name_value(@status)
+			@children = []
+			@parent = nil
 			%w/Name PPid VmSize/.each { |field|
 				fsym = Procfs::Common.symbolize(field)
 				fval = @fields[fsym]
@@ -52,5 +55,20 @@ module Procfs
 			}
 		end
 
+		def add_child(status)
+			return false unless status.ppid == @pid
+			@children << status unless @children.include?(status)
+			status.parent = @pid
+			#puts "Added child: %s:%d children=[%s]" % [ @name, @pid, @children.join(", ") ]
+			true
+		end
+
+		def print_tree(indent=0)
+			puts "%s+ %s:%d" % [ "\t"*indent, @name, @pid ]
+			return if @children.empty?
+			@children.each { |child_status|
+				child_status.print_tree(indent+1)
+			}
+		end
 	end
 end

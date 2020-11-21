@@ -53,6 +53,10 @@ module Memory
 			@logger.debug "Scanning system at #{Time.now}"
 			ps = Procfs::Scanner.new
 			ps.get_pids(:users=>["steeve", "lissa", "foobarbaz"])
+
+			ps.grow_process_tree()
+			ps.print_process_tree()
+
 			return 0
 		rescue => e
 			@logger.error "memory scan failed: #{e.message}"

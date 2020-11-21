@@ -11,9 +11,10 @@ module Procfs
 			@@logger = opts[:logger]
 		end
 
-		attr_reader :pids, :meminfo
+		attr_reader :pids, :meminfo, :root
 		def initialize
 			@pids = []
+			@root = []
 			@meminfo = Procfs::Meminfo.new
 			@@logger.debug @meminfo.inspect
 		end
@@ -79,6 +80,26 @@ module Procfs
 					]
 			}
 
+		end
+
+		def grow_process_tree
+			@pid_status.each_pair { |pid, status|
+				next if status.name.eql?("systemd")
+				@pid_status.each_pair { |p, s|
+					next if p == pid
+					status.add_child(s)
+				}
+			}
+
+			@pid_status.each_pair { |pid, status|
+				@root << status if status.parent.nil? || status.ppid == 1
+			}
+		end
+
+		def print_process_tree()
+			@root.each { |root_status|
+				root_status.print_tree
+			}
 		end
 
 	end
