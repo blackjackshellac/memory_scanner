@@ -59,10 +59,9 @@ module Procfs
 		def get_pids(opts={:users=>[]})
 
 			uids = get_uids(opts[:users])
-			piddirs=Dir.glob("/proc/[0-9]*")
 
 			@pid_status = {}
-			piddirs.each { |piddir|
+			Procfs::Common.pid_dirs { |piddir|
 				pid=File.basename(piddir)
 				dstat = File.lstat(piddir)
 				next unless uid_in_uids?(dstat.uid, uids)
@@ -70,7 +69,14 @@ module Procfs
 				pid_status=Procfs::Status.new(pid)
 				@pid_status[pid] = pid_status
 
-				@@logger.debug "pid=#{pid} uid=#{pid_status.fields[:uid]} vmdata=#{pid_status.fields[:vmdata]}"
+				@@logger.debug "%s: pid=%d name=%s ppid=%s vmsize=%s" %
+					[
+						piddir,
+						pid_status.pid,
+						pid_status.name,
+						pid_status.ppid,
+						pid_status.vmsize
+					]
 			}
 
 		end

@@ -40,10 +40,16 @@ module Procfs
 
 	class Status
 		attr_reader :pid, :status, :fields
+		attr_reader :name, :ppid, :vmsize
 		def initialize(pid)
 			@pid = pid
 			@status=File.read(File.join("/proc", @pid, "status"))
 			@fields = Procfs::Common.parse_name_value(@status)
+			%w/Name PPid VmSize/.each { |field|
+				fsym = Procfs::Common.symbolize(field)
+				fval = @fields[fsym]
+				instance_variable_set("@#{fsym}", @fields[fsym])
+			}
 		end
 
 	end
