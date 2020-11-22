@@ -52,9 +52,8 @@ module Memory
 		def scan
 			@logger.debug "Scanning system at #{Time.now}"
 			ps = Procfs::Scanner.new
-			ps.get_pids(:users=>["steeve", "lissa", "foobarbaz"])
+			ps.scan(:users=>["steeve", "lissa", "foobarbaz"])
 
-			ps.grow_process_tree()
 			ps.print_process_tree()
 
 			return 0

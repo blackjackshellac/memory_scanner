@@ -40,16 +40,18 @@ module Procfs
 
 	class Status
 		attr_reader :pid, :status, :fields, :children
-		attr_reader :name, :ppid, :vmsize
+		attr_reader :name, :ppid, :vmsize, :vmrss, :vmswap
+		attr_reader :rss_total
 		attr_accessor :parent
 		def initialize(pid)
 			@pid = pid
 			@status=File.read(File.join("/proc", @pid, "status"))
-			@fields = Procfs::Common.parse_name_value(@status)
+			@fields = Common.parse_name_value(@status)
 			@children = []
+			@rss_total = nil
 			@parent = nil
-			%w/Name PPid VmSize/.each { |field|
-				fsym = Procfs::Common.symbolize(field)
+			%w/Name PPid VmSize VmRss VmSwap/.each { |field|
+				fsym = Common.symbolize(field)
 				fval = @fields[fsym]
 				instance_variable_set("@#{fsym}", @fields[fsym])
 			}
@@ -63,10 +65,39 @@ module Procfs
 			true
 		end
 
-		def print_tree(indent=0)
-			puts "%s+ %s:%d" % [ "\t"*indent, @name, @pid ]
-			return if @children.empty?
+		##
+		# get the total amount of memory for this process and all of its children
+		#
+		# @return [String] total size of memory including children
+		def get_total_memory(vmvalue)
+			total = instance_variable_get("@#{vmvalue}").to_i
 			@children.each { |child_status|
+				total += child_status.get_total_memory(vmvalue)
+			}
+			total
+		end
+
+		def get_rss_total
+			@rss_total = get_total_memory("vmrss") if @rss_total.nil?
+			@rss_total
+		end
+
+		def summary(tabs)
+			@rss_total = get_rss_total
+			puts "%s+ %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @name, @pid,
+			 	Common.as_size(@rss_total), @vmsize.to_s, vmrss.to_s, vmswap.to_i <= 0 ? "" : " VmSwap=[#{@vmswap}]"]
+		end
+
+		##
+		# print summary of process, and recursively for children, sorted by total
+		# rss memory usage
+		#
+		def print_tree(indent=0)
+			summary("\t"*indent)
+			@children.sort_by { |child_status|
+				child_status.get_rss_total
+			}.each { |child_status|
+				# recursively print trees for child statuses
 				child_status.print_tree(indent+1)
 			}
 		end

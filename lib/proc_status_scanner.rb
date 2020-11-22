@@ -13,8 +13,11 @@ module Procfs
 
 		attr_reader :pids, :meminfo, :root
 		def initialize
+			# array of pids for all processes scanned
 			@pids = []
+			# array of top level process status objects
 			@root = []
+			@pid_status = {}
 			@meminfo = Procfs::Meminfo.new
 			@@logger.debug @meminfo.inspect
 		end
@@ -57,7 +60,7 @@ module Procfs
 			uids.empty? || uids.include?(uid)
 		end
 
-		def get_pids(opts={:users=>[]})
+		def scan(opts={:users=>[]})
 
 			uids = get_uids(opts[:users])
 
@@ -70,18 +73,25 @@ module Procfs
 				pid_status=Procfs::Status.new(pid)
 				@pid_status[pid] = pid_status
 
-				@@logger.debug "%s: pid=%d name=%s ppid=%s vmsize=%s" %
-					[
-						piddir,
-						pid_status.pid,
-						pid_status.name,
-						pid_status.ppid,
-						pid_status.vmsize
-					]
+				# @@logger.debug "%s: pid=%d name=%s ppid=%s vmsize=%s" %
+				# 	[
+				# 		piddir,
+				# 		pid_status.pid,
+				# 		pid_status.name,
+				# 		pid_status.ppid,
+				# 		pid_status.vmsize
+				# 	]
 			}
 
+			grow_process_tree
 		end
 
+		##
+		# iterate through all scanned pid_status and setup relationshiops between
+		# processes and their children/parents.
+		#
+		# Also creates and array of top level processes in @root instance variable
+		#
 		def grow_process_tree
 			@pid_status.each_pair { |pid, status|
 				next if status.name.eql?("systemd")
@@ -96,8 +106,13 @@ module Procfs
 			}
 		end
 
+		##
+		# print process tree for each top level process sorted by total rss
+		#
 		def print_process_tree()
-			@root.each { |root_status|
+			@root.sort_by { |root_status|
+				root_status.get_rss_total
+			}.each { |root_status|
 				root_status.print_tree
 			}
 		end
