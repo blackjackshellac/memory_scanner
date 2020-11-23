@@ -1,46 +1,81 @@
 
 require_relative 'proc_common'
+require_relative 'numeric_ext'
 
 module Procfs
-	# $ cd /proc/[pid]
-	# $ cat meminfo
-	# Name:	Web Content
-	# Umask:	0022
-	# State:	S (sleeping)
-	# Tgid:	377820
-	# Ngid:	0
-	# Pid:	377820
-	# PPid:	377642
-	# TracerPid:	0
-	# Uid:	1201	1201	1201	1201
-	# Gid:	1201	1201	1201	1201
-	# FDSize:	128
-	# Groups:	10 494 496 497 501 1201 1205
-	# NStgid:	377820
-	# NSpid:	377820
-	# NSpgid:	3035
-	# NSsid:	3035
-	# VmPeak:	 3425508 kB
-	# VmSize:	 3321700 kB
-	# VmLck:	       0 kB
-	# VmPin:	       0 kB
-	# VmHWM:	  754624 kB
-	# VmRSS:	  452668 kB
-	# RssAnon:	  342052 kB
-	# RssFile:	   95612 kB
-	# RssShmem:	   15004 kB
-	# VmData:	  617768 kB
-	# VmStk:	     252 kB
-	# VmExe:	     400 kB
-	# VmLib:	  139648 kB
-	# VmPTE:	    3048 kB
-	# VmSwap:	       0 kB
+	# $ cat /proc/meminfo
+	# MemTotal:       16295240 kB
+	# MemFree:         6343852 kB
+	# MemAvailable:   10214300 kB
+	# Buffers:          139844 kB
+	# Cached:          4515240 kB
+	# SwapCached:            0 kB
+	# Active:          2035688 kB
+	# Inactive:        6914588 kB
+	# Active(anon):       5152 kB
+	# Inactive(anon):  4941120 kB
+	# Active(file):    2030536 kB
+	# Inactive(file):  1973468 kB
+	# Unevictable:      422044 kB
+	# Mlocked:            6160 kB
+	# SwapTotal:      12386296 kB
+	# SwapFree:       12386296 kB
+	# Dirty:              1156 kB
+	# Writeback:             0 kB
+	# AnonPages:       4717108 kB
+	# Mapped:          1089672 kB
+	# Shmem:            684400 kB
+	# KReclaimable:     202388 kB
+	# Slab:             367344 kB
+	# SReclaimable:     202388 kB
+	# SUnreclaim:       164956 kB
+	# KernelStack:       29600 kB
+	# PageTables:        58428 kB
+	# NFS_Unstable:          0 kB
+	# Bounce:                0 kB
+	# WritebackTmp:          0 kB
+	# CommitLimit:    20533916 kB
+	# Committed_AS:   16305772 kB
+	# VmallocTotal:   34359738367 kB
+	# VmallocUsed:       68772 kB
+	# VmallocChunk:          0 kB
+	# Percpu:            10624 kB
+	# HardwareCorrupted:     0 kB
+	# AnonHugePages:         0 kB
+	# ShmemHugePages:        0 kB
+	# ShmemPmdMapped:        0 kB
+	# FileHugePages:         0 kB
+	# FilePmdMapped:         0 kB
+	# CmaTotal:              0 kB
+	# CmaFree:               0 kB
+	# HugePages_Total:       0
+	# HugePages_Free:        0
+	# HugePages_Rsvd:        0
+	# HugePages_Surp:        0
+	# Hugepagesize:       2048 kB
+	# Hugetlb:               0 kB
+	# DirectMap4k:      487980 kB
+	# DirectMap2M:     9904128 kB
+	# DirectMap1G:     7340032 kB
 
 	class Meminfo
 		attr_reader :meminfo, :fields
+		attr_reader :memtotal, :memfree, :memavailable, :swaptotal, :swapfree
 		def initialize
 			@meminfo=File.read(File.join("/proc", "meminfo"))
 			@fields = Procfs::Common.parse_name_value(@meminfo)
+			%w/MemTotal MemFree MemAvailable SwapTotal SwapFree/.each { |field|
+				fsym = Common.symbolize(field)
+				fval = @fields[fsym]
+				instance_variable_set("@#{fsym}", @fields[fsym])
+			}
+		end
+
+		def summary
+			"Memory Total=%s Free=%s Avail=%s\nSwap Total=%s Free=%s Used=%s" % [
+				@memtotal.to_bibyte, @memfree.to_bibyte, @memavailable.to_bibyte,
+				@swaptotal.to_bibyte, @swapfree.to_bibyte, (@swaptotal-@swapfree).to_bibyte
+			]
 		end
 	end
 end

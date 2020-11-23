@@ -61,6 +61,7 @@ module Memory
 			ps.scan(:users=>@users)
 
 			ps.print_process_tree()
+			puts ps.meminfo.summary
 
 			return 0
 		rescue => e

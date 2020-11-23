@@ -85,7 +85,7 @@ module Procfs
 
 		def summary(tabs)
 			@rss_total = get_rss_total
-			puts "%s+ %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @name, @pid,
+			return "%s+ %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @name, @pid,
 			 	@rss_total.to_bibyte, @vmsize.to_bibyte, @vmrss.to_bibyte, vmswap.to_i <= 0 ? "" : " VmSwap=[#{@vmswap.to_bibyte}]"]
 		end
 
@@ -94,7 +94,7 @@ module Procfs
 		# rss memory usage
 		#
 		def print_tree(indent=0)
-			summary("\t"*indent)
+			puts summary("\t"*indent)
 			@children.sort_by { |child_status|
 				child_status.get_rss_total
 			}.each { |child_status|
