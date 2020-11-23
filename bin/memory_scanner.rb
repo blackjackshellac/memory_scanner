@@ -24,15 +24,21 @@ module Memory
       MD=File.expand_path(File.dirname(File.realpath($0)))
 
 		# @attr_reader [Logger] logger - instance of logger
-		attr_reader :logger
+		attr_reader :logger, :users
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
+			@users = []
 			Procfs::Scanner.init({:logger=>@logger})
 		end
 
 		def parse_clargs
 			optparser=OptionParser.new { |opts|
 				opts.banner = "#{MERB} [options]\n"
+
+				opts.on('-u', '--users USERS', Array, "List of users, default is all users") { |users|
+					@users.concat(users)
+					@users.uniq!
+				}
 
 				opts.on('-D', '--debug', "Enable debugging output") {
 					@logger.level = Logger::DEBUG
@@ -52,7 +58,7 @@ module Memory
 		def scan
 			@logger.debug "Scanning system at #{Time.now}"
 			ps = Procfs::Scanner.new
-			ps.scan(:users=>["steeve", "lissa", "foobarbaz"])
+			ps.scan(:users=>@users)
 
 			ps.print_process_tree()
 

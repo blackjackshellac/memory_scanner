@@ -2,6 +2,7 @@
 #
 
 require_relative 'proc_common'
+require_relative 'numeric_ext'
 
 module Procfs
 	# $ cd /proc/[pid]
@@ -85,7 +86,7 @@ module Procfs
 		def summary(tabs)
 			@rss_total = get_rss_total
 			puts "%s+ %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @name, @pid,
-			 	Common.as_size(@rss_total), @vmsize.to_s, vmrss.to_s, vmswap.to_i <= 0 ? "" : " VmSwap=[#{@vmswap}]"]
+			 	@rss_total.to_bibyte, @vmsize.to_bibyte, @vmrss.to_bibyte, vmswap.to_i <= 0 ? "" : " VmSwap=[#{@vmswap.to_bibyte}]"]
 		end
 
 		##
