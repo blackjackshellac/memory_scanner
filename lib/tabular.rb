@@ -152,4 +152,6 @@ class Tabular
 	end
 end
 
-Tabular.test
+# only run the test if this file is executed at the command line
+# not if it is loaded with require
+Tabular.test if __FILE__ == $0
