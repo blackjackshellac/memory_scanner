@@ -61,6 +61,8 @@ module Procfs
 	class Meminfo
 		attr_reader :meminfo, :fields
 		attr_reader :memtotal, :memfree, :memavailable, :swaptotal, :swapfree
+		attr_reader :mem_percent_free, :mem_percent_used
+		attr_reader :swap_percent_free, :swap_percent_used
 		def initialize
 			@meminfo=File.read(File.join("/proc", "meminfo"))
 			@fields = Procfs::Common.parse_name_value(@meminfo)
@@ -69,12 +71,29 @@ module Procfs
 				fval = @fields[fsym]
 				instance_variable_set("@#{fsym}", @fields[fsym])
 			}
+			@mem_percent_free = percent_f(@memfree, @memtotal)
+			@mem_percent_used = percent_f(@memtotal-@memfree, @memtotal)
+			@swap_percent_free = percent_f(@swapfree, @swaptotal)
+			@swap_percent_used = percent_f(@swaptotal-@swapfree, @swaptotal)
+		end
+
+		def percent_f(part, total)
+			part.to_f/total*100
+		end
+
+		##
+		# print percent with up to two digits, and strip off trailing 0s
+		#
+		def percent_to_s(val)
+			("%.2f" % val).sub(/\.?0+$/, "")+"%"
 		end
 
 		def summary
-			"Memory Total=%s Free=%s Avail=%s\nSwap Total=%s Free=%s Used=%s" % [
+			"Memory Total=%s Free=%s Avail=%s [Free=%s Used=%s]\nSwap Total=%s Free=%s Used=%s [Free=%s Used=%s]\n" % [
 				@memtotal.to_bibyte, @memfree.to_bibyte, @memavailable.to_bibyte,
-				@swaptotal.to_bibyte, @swapfree.to_bibyte, (@swaptotal-@swapfree).to_bibyte
+				percent_to_s(@mem_percent_free), percent_to_s(@mem_percent_used),
+				@swaptotal.to_bibyte, @swapfree.to_bibyte, (@swaptotal-@swapfree).to_bibyte,
+				percent_to_s(@swap_percent_free), percent_to_s(@swap_percent_used)
 			]
 		end
 	end
