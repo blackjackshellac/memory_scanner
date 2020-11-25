@@ -1,52 +1,47 @@
 #!/usr/bin/env ruby
-
+#
 # based on https://stackoverflow.com/questions/28684598/print-an-array-into-a-table-in-ruby
-# col_labels = { date: "Date", from: "From", subject: "Subject" }
-# arr = [{date: "2014-12-01", from: "Ferdous", subject: "Homework this week"},
-#        {date: "2014-12-01", from: "Dajana", subject: "Keep on coding! :)"},
-#        {date: "2014-12-02", from: "Ariane", subject: "Re: Homework this week"}]
 #
-#  @columns = col_labels.each_with_object({}) { |(col,label),h|
-#    h[col] = { label: label,
-#               width: [arr.map { |g| g[col].size }.max, label.size].max } }
-#    # => {:date=>    {:label=>"Date",    :width=>10},
-#    #     :from=>    {:label=>"From",    :width=>7},
-#    #     :subject=> {:label=>"Subject", :width=>22}}
+# @headers = {
+# 	rowlabel: "",
+# 	total: "Total",
+# 	used:	"Used",
+# 	pused: "%Used",
+# 	free: "Free",
+# 	pfree: "%Free"
+# }
 #
-#  def write_header
-#    puts "| #{ @columns.map { |_,g| g[:label].ljust(g[:width]) }.join(' | ') } |"
-#  end
+# table=Tabular.new(@headers)
 #
-#  def write_divider
-#    puts "+-#{ @columns.map { |_,g| "-"*g[:width] }.join("-+-") }-+"
-#  end
+# table.addrow( {
+# 	rowlabel: "Memory",
+# 	total: 10,
+# 	used: 5,
+# 	pused: "50%",
+# 	free: 5,
+# 	pfree: "50%"
+# 	})
 #
-#  def write_line(h)
-#    str = h.keys.map { |k| h[k].ljust(@columns[k][:width]) }.join(" | ")
-#    puts "| #{str} |"
-#  end
-#  write_divider
-# write_header
-# write_divider
-# arr.each { |h| write_line(h) }
-# write_divider
+# table.addrow({
+# 	rowlabel: "Swap",
+# 	total: 2,
+# 	used: 1,
+# 	pused: "50%",
+# 	free: 1,
+# 	pfree: "50%"
+# 	})
 #
-# +------------+---------+------------------------+
-# | Date       | From    | Subject                |
-# +------------+---------+------------------------+
-# | 2014-12-01 | Ferdous | Homework this week     |
-# | 2014-12-01 | Dajana  | Keep on coding! :)     |
-# | 2014-12-02 | Ariane  | Re: Homework this week |
-# +------------+---------+------------------------+
+# table.print
 
 class Tabular
 	MIN_WIDTH = 5
 
+	attr_reader :rows
 	def initialize(col_labels)
 		# initialize column labels hash
 		@col_labels = col_labels
 		@data_keys = @col_labels.keys
-		@arr = []
+		@rows = []
 		@columns = {}
 	end
 
@@ -64,7 +59,7 @@ class Tabular
 	def addrow(data, opts=DEF_ADD_ROW_OPTS)
 		#opts=DEF_ADD_ROW_OPTS.merge(opts)
 		validate_row(data)
-		@arr << data
+		@rows << data
 	end
 
 	def columnize
@@ -72,8 +67,8 @@ class Tabular
 			h[key] = {
 				label: label,
 				width: [
-					@arr.map { |g|
-						g[key].size
+					@rows.map { |row|
+						row[key].size
 					}.max, label.size
 				].max
 			}
@@ -81,61 +76,80 @@ class Tabular
 		}
 	end
 
-	 def write_header
-	   headers=@columns.map { |_,g|
+	def header_to_s
+		 headers=@columns.map { |_,g|
 			g[:label].to_s.center(g[:width])
 		}
-		puts "| "+headers.join(' | ')+" |"
-	 end
+		"| "+headers.join(' | ')+" |"
+	end
 
-	 def write_divider
-	   puts "+-#{ @columns.map { |_,g| "-"*g[:width] }.join("-+-") }-+"
-	 end
+	def divider_to_s
+		 "+-#{ @columns.map { |_,g| "-"*g[:width] }.join("-+-") }-+"
+	end
 
-	 def write_line(h)
-	   lines = h.keys.map { |k|
-			h[k].to_s.ljust(@columns[k][:width])
+	def row_to_s(row)
+		 lines = row.keys.map { |key|
+			row[key].to_s.ljust(@columns[key][:width])
 		}
-		str = lines.join(" | ")
-	   puts "| #{str} |"
-	 end
+		line = lines.join(" | ")
+		"| #{line} |"
+	end
 
-	def print
+	def to_s
 		columnize if @columns.empty?
 
-		write_divider
-		write_header
-		write_divider
-		@arr.each { |data| write_line(data) }
-		write_divider
+		s=""
+		rowlines { |line|
+			s += line + "\n"
+		}
+	end
+
+	def rowlines
+		yield (divider_to_s)
+		yield (header_to_s)
+		yield (divider_to_s)
+		@rows.each { |row|
+			yield (row_to_s(row))
+		}
+		yield (divider_to_s)
+	end
+
+	def print
+		puts to_s
+	end
+
+	def self.test
+		headers = {
+			rowlabel: "",
+			total: "Total",
+			used:	"Used",
+			pused: "%Used",
+			free: "Free",
+			pfree: "%Free"
+		}
+
+		table=Tabular.new(headers)
+
+		table.addrow( {
+			rowlabel: "Memory",
+			total: 10,
+			used: 5,
+			pused: "50%",
+			free: 5,
+			pfree: "50%"
+			})
+
+		table.addrow({
+			rowlabel: "Swap",
+			total: 2,
+			used: 1,
+			pused: "50%",
+			free: 1,
+			pfree: "50%"
+			})
+
+		table.print
 	end
 end
 
-@headers = {
-	rowlabel: "",
-	total: "Total",
-	used:	"Used",
-	pused: "%Used",
-	free: "Free",
-	pfree: "%Free"
-}
-
-table=Tabular.new(@headers)
-table.addrow( {
-	rowlabel: "Memory",
-	total: 10,
-	used: 5,
-	pused: "50%",
-	free: 5,
-	pfree: "50%"
-	})
-table.addrow({
-	rowlabel: "Swap",
-	total: 2,
-	used: 1,
-	pused: "50%",
-	free: 1,
-	pfree: "50%"
-	})
-
-table.print
+Tabular.test
