@@ -1,6 +1,7 @@
 
 require_relative 'proc_common'
 require_relative 'numeric_ext'
+require_relative 'tabular'
 
 module Procfs
 	# $ cat /proc/meminfo
@@ -89,12 +90,38 @@ module Procfs
 		end
 
 		def summary
-			"Memory Total=%s Free=%s Avail=%s [Free=%s Used=%s]\nSwap Total=%s Free=%s Used=%s [Free=%s Used=%s]\n" % [
-				@memtotal.to_bibyte, @memfree.to_bibyte, @memavailable.to_bibyte,
-				percent_to_s(@mem_percent_free), percent_to_s(@mem_percent_used),
-				@swaptotal.to_bibyte, @swapfree.to_bibyte, (@swaptotal-@swapfree).to_bibyte,
-				percent_to_s(@swap_percent_free), percent_to_s(@swap_percent_used)
-			]
+			# "Memory Total=%s Free=%s Avail=%s [Free=%s Used=%s]\nSwap Total=%s Free=%s Used=%s [Free=%s Used=%s]\n" % [
+			# 	@memtotal.to_bibyte, @memfree.to_bibyte, @memavailable.to_bibyte,
+			# 	percent_to_s(@mem_percent_free), percent_to_s(@mem_percent_used),
+			# 	@swaptotal.to_bibyte, @swapfree.to_bibyte, (@swaptotal-@swapfree).to_bibyte,
+			# 	percent_to_s(@swap_percent_free), percent_to_s(@swap_percent_used)
+			# ]
+			headers = {
+				rowlabel: "",
+				total: "Total",
+				used:	"Used",
+				pused: "%Used",
+				free: "Free",
+				pfree: "%Free"
+			}
+			table = Tabular.new(headers)
+			table.addrow({
+				rowlabel: "Memory",
+				total: @memtotal.to_bibyte,
+				used: (@memtotal-@memfree).to_bibyte,
+				pused: percent_to_s(@mem_percent_used),
+				free: @memfree.to_bibyte,
+				pfree: percent_to_s(@mem_percent_free)
+			})
+			table.addrow({
+				rowlabel: "Swap",
+				total: @swaptotal.to_bibyte,
+				used: (@swaptotal-@swapfree).to_bibyte,
+				pused: percent_to_s(@swap_percent_used),
+				free: @swapfree.to_bibyte,
+				pfree: percent_to_s(@swap_percent_free)
+			})
+			table.to_s
 		end
 	end
 end
