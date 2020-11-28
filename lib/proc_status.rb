@@ -104,7 +104,7 @@ module Procfs
 
 		def summary(tabs)
 			@rss_total = get_rss_total
-			return "%s+ %s:%d> %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @username, @uid, @name, @pid,
+			return "%s+ %s:%d> %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @name, @pid, @username, @uid,
 			 	@rss_total.to_bibyte, @vmsize.to_bibyte, @vmrss.to_bibyte, vmswap.to_i <= 0 ? "" : " VmSwap=[#{@vmswap.to_bibyte}]"]
 		end
 
