@@ -1,6 +1,8 @@
 #
 #
 
+require 'etc'
+
 require_relative 'proc_common'
 require_relative 'numeric_ext'
 
@@ -39,10 +41,13 @@ module Procfs
 	# VmPTE:	    3048 kB
 	# VmSwap:	       0 kB
 
+	# Uid and Gid fields
+	# Uid: real UID, effective UID, saved set UID, and file system UID
+	# Gid: real GID, effective GID, saved set GID, and file system GID
 	class Status
 		attr_reader :pid, :status, :fields, :children
 		attr_reader :name, :ppid, :vmsize, :vmrss, :vmswap
-		attr_reader :rss_total
+		attr_reader :rss_total, :ids, :uid, :gid, :username, :group
 		attr_accessor :parent
 		def initialize(pid)
 			@pid = pid
@@ -56,6 +61,20 @@ module Procfs
 				fval = @fields[fsym]
 				instance_variable_set("@#{fsym}", @fields[fsym])
 			}
+			@ids = {}
+			%w/Uid Gid/.each { |field|
+				fsym = Common.symbolize(field)
+				fval = @fields[fsym]
+				vals = fval.split(/\s+/, 4)
+				@ids[fsym]||={}
+				%w/real effective saved_set fiile_system/.each_with_index { |value, i|
+					@ids[fsym][value.to_sym] = vals[i].to_i
+				}
+			}
+			@uid = @ids[:uid][:real]||-1
+			@username = @uid == -1 ? "unknown uid" : Etc.getpwuid(@uid).name
+			@gid = @ids[:gid][:real]||-1
+			@group = @gid == -1 ? "unknown gid" : Etc.getgrgid(@gid).name
 		end
 
 		def add_child(status)
@@ -85,7 +104,7 @@ module Procfs
 
 		def summary(tabs)
 			@rss_total = get_rss_total
-			return "%s+ %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @name, @pid,
+			return "%s+ %s:%d> %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @username, @uid, @name, @pid,
 			 	@rss_total.to_bibyte, @vmsize.to_bibyte, @vmrss.to_bibyte, vmswap.to_i <= 0 ? "" : " VmSwap=[#{@vmswap.to_bibyte}]"]
 		end
 
