@@ -28,7 +28,7 @@ module Memory
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
 			@users = []
-			@process_tree = false
+			@process_tree = true
 			@meminfo_summary = true
 			Procfs::Scanner.init({:logger=>@logger})
 		end
@@ -37,9 +37,13 @@ module Memory
 			optparser=OptionParser.new { |opts|
 				opts.banner = "#{MERB} [options]\n"
 
-				opts.on('-u', '--users USERS', Array, "List of users, default is all users") { |users|
-					@users.concat(users)
-					@users.uniq!
+				opts.on('-u', '--users USERS', Array, "List of users, default is current user (use :all for all users)") { |users|
+					if users.include?(":all")
+						@users = [ :all ]
+					else
+						@users.concat(users)
+						@users.uniq!
+					end
 				}
 
 				opts.on('-P', '--[no-]process-tree', "Print the process tree to STDOUT") { |bool|

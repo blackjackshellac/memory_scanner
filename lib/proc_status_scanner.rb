@@ -26,7 +26,7 @@ module Procfs
 			begin
 				return Etc.getpwnam(user).uid
 			rescue => e
-				@@logger.warn e.to_s
+				@@logger.warn "#{e.class}: #{e.to_s}"
 			end
 			nil
 		end
@@ -37,10 +37,13 @@ module Procfs
 		# @param [Array] users list of users or empty for current user, or all users
 		# for user root
 		def get_uids(users)
+			#puts "users=#{users.inspect}"
 			if users.nil? || users.empty?
 				users ||= []
 				curuser = Etc.getlogin
 				users << curuser unless curuser.eql?("root")
+			elsif users.include?(:all)
+				return []
 			end
 			uids = []
 			users.each { |user|
