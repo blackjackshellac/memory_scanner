@@ -89,7 +89,7 @@ module Procfs
 			("%.2f" % val).sub(/\.?0+$/, "")+"%"
 		end
 
-		def summary
+		def summary(stream)
 			# "Memory Total=%s Free=%s Avail=%s [Free=%s Used=%s]\nSwap Total=%s Free=%s Used=%s [Free=%s Used=%s]\n" % [
 			# 	@memtotal.to_bibyte, @memfree.to_bibyte, @memavailable.to_bibyte,
 			# 	percent_to_s(@mem_percent_free), percent_to_s(@mem_percent_used),
@@ -121,7 +121,7 @@ module Procfs
 				free: @swapfree.to_bibyte,
 				pfree: percent_to_s(@swap_percent_free)
 			})
-			table.to_s
+			stream.puts table.to_s
 		end
 	end
 end

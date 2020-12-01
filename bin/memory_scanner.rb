@@ -24,11 +24,12 @@ module Memory
       MD=File.expand_path(File.dirname(File.realpath($0)))
 
 		# @attr_reader [Logger] logger - instance of logger
-		attr_reader :logger, :users, :print_tree
+		attr_reader :logger, :users
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
 			@users = []
-			@print_tree = false
+			@process_tree = false
+			@meminfo_summary = true
 			Procfs::Scanner.init({:logger=>@logger})
 		end
 
@@ -41,8 +42,12 @@ module Memory
 					@users.uniq!
 				}
 
-				opts.on('-P', '--print-tree', "Print the process tree to STDOUT") {
-					@print_tree = true
+				opts.on('-P', '--[no-]process-tree', "Print the process tree to STDOUT") { |bool|
+					@process_tree = bool
+				}
+
+				opts.on('-M', '--[no-]meminfo_summary', "Print meminfo summary") { |bool|
+					@meminfo_summary = bool
 				}
 
 				opts.on('-D', '--debug', "Enable debugging output") {
@@ -65,8 +70,8 @@ module Memory
 			ps = Procfs::Scanner.new
 			ps.scan(:users=>@users)
 
-			ps.print_process_tree(STDOUT) if @print_tree
-			puts ps.meminfo.summary
+			ps.print_process_tree(STDOUT) if @process_tree
+			ps.meminfo.summary(STDOUT) if @meminfo_summary
 
 			return 0
 		rescue => e
