@@ -24,7 +24,7 @@ module Memory
       MD=File.expand_path(File.dirname(File.realpath($0)))
 
 		# @attr_reader [Logger] logger - instance of logger
-		attr_reader :logger, :users
+		attr_reader :logger, :users, :ps
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
 			@users = []
@@ -67,22 +67,22 @@ module Memory
 
 		def scan
 			@logger.debug "Scanning system at #{Time.now}"
-			ps = Procfs::Scanner.new
-			ps.scan(:users=>@users)
-
-			ps.print_process_tree(STDOUT) if @process_tree
-			ps.meminfo.summary(STDOUT) if @meminfo_summary
-
-			return 0
+			@ps = Procfs::Scanner.new
+			@ps.scan(:users=>@users)
 		rescue => e
 			@logger.error "memory scan failed: #{e.message}"
 			puts e.backtrace.join("\n")
-			return 1
+			exit 1
+		end
+
+		def summarize
+			@ps.print_process_tree(STDOUT) if @process_tree
+			@ps.meminfo.summary(STDOUT) if @meminfo_summary
 		end
 	end
 end
 
 ms = Memory::ScannerMain.new
 ms.parse_clargs
-ev = ms.scan
-exit ev
+ms.scan
+ms.summarize
