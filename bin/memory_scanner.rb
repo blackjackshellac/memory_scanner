@@ -24,10 +24,11 @@ module Memory
       MD=File.expand_path(File.dirname(File.realpath($0)))
 
 		# @attr_reader [Logger] logger - instance of logger
-		attr_reader :logger, :users
+		attr_reader :logger, :users, :print_tree
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
 			@users = []
+			@print_tree = false
 			Procfs::Scanner.init({:logger=>@logger})
 		end
 
@@ -38,6 +39,10 @@ module Memory
 				opts.on('-u', '--users USERS', Array, "List of users, default is all users") { |users|
 					@users.concat(users)
 					@users.uniq!
+				}
+
+				opts.on('-P', '--print-tree', "Print the process tree to STDOUT") {
+					@print_tree = true
 				}
 
 				opts.on('-D', '--debug', "Enable debugging output") {
@@ -60,7 +65,7 @@ module Memory
 			ps = Procfs::Scanner.new
 			ps.scan(:users=>@users)
 
-			ps.print_process_tree()
+			ps.print_process_tree(STDOUT) if @print_tree
 			puts ps.meminfo.summary
 
 			return 0

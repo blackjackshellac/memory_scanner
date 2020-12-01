@@ -112,13 +112,13 @@ module Procfs
 		# print summary of process, and recursively for children, sorted by total
 		# rss memory usage
 		#
-		def print_tree(indent=0)
-			puts summary("\t"*indent)
+		def print_tree(stream, indent=0)
+			stream.puts summary("\t"*indent)
 			@children.sort_by { |child_status|
 				child_status.get_rss_total
 			}.each { |child_status|
 				# recursively print trees for child statuses
-				child_status.print_tree(indent+1)
+				child_status.print_tree(stream, indent+1)
 			}
 		end
 	end
