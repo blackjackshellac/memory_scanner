@@ -54,6 +54,11 @@ module Memory
 					@meminfo_summary = bool
 				}
 
+				opts.on('-q', '--quiet', "Quiet") {
+					@meminfo_summary = false
+					@process_tree = false
+				}
+				
 				opts.on('-D', '--debug', "Enable debugging output") {
 					@logger.level = Logger::DEBUG
 				}
