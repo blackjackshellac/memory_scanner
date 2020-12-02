@@ -5,6 +5,9 @@
 require_relative '../lib/logger'
 require_relative '../lib/proc_status_scanner'
 require 'optparse'
+require 'fileutils'
+require 'etc'
+require 'json'
 
 ##
 #
@@ -23,13 +26,20 @@ module Memory
       # Directory where the script lives, resolves symlinks
       MD=File.expand_path(File.dirname(File.realpath($0)))
 
+		TMP=File.join("/var/tmp/#{ME}", Etc.getlogin)
+		FileUtils.mkdir_p(TMP)
+
 		# @attr_reader [Logger] logger - instance of logger
 		attr_reader :logger, :users, :ps
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
+			@now = Time.now
 			@users = []
 			@process_tree = true
 			@meminfo_summary = true
+			@record=""
+			@scanid=@now.strftime("#{ME}_%Y%m%d")
+			@data_record = nil
 			Procfs::Scanner.init({:logger=>@logger})
 		end
 
@@ -46,6 +56,14 @@ module Memory
 					end
 				}
 
+				# TODO it would be better if the data were updated on a running basis,
+				# but that would be a lot easier with an SQL database, perhaps this eventually
+				# https://github.com/sparklemotion/sqlite3-ruby
+				opts.on('-r', '--record [SCANID]', String, "Default scanid is updated daily #{@scanid}") { |scanid|
+					@scanid = scanid unless scanid.nil?
+					@record = File.join(TMP, @scanid+".json")
+				}
+
 				opts.on('-P', '--[no-]process-tree', "Print the process tree to STDOUT") { |bool|
 					@process_tree = bool
 				}
@@ -58,7 +76,7 @@ module Memory
 					@meminfo_summary = false
 					@process_tree = false
 				}
-				
+
 				opts.on('-D', '--debug', "Enable debugging output") {
 					@logger.level = Logger::DEBUG
 				}
@@ -72,12 +90,41 @@ module Memory
 			}
 			optparser.parse!
 
+		rescue OptionParser::InvalidOption => e
+			@logger.die "#{e.class}: #{e.message}"
+		end
+
+		def load_data_record
+			@data_record = nil
+			unless @record.empty?
+				json = nil
+				if File.exist?(@record)
+					@logger.info "Reading data record #{@record}"
+					json = File.read(@record)
+				end
+				@data_record = json.nil? ? {} : JSON.parse(json)
+			end
+		rescue => e
+			@logger.error "Failed to parse json data record #{@record}"
+			@logger.error "#{@e.class}: #{@e.message}"
+			@data_record = nil
+		ensure
+			@data_record
+		end
+
+		def save_data_record
+			return if @data_record.nil? || @record.empty?
+			json = JSON.pretty_generate(@data_record)
+			File.open(@record, "w") { |fd|
+				@logger.info "Writing data record #{@record}"
+				fd.puts json
+			}
 		end
 
 		def scan
 			@logger.debug "Scanning system at #{Time.now}"
 			@ps = Procfs::Scanner.new
-			@ps.scan(:users=>@users)
+			@ps.scan(users: @users)
 		rescue => e
 			@logger.error "memory scan failed: #{e.message}"
 			puts e.backtrace.join("\n")
@@ -93,5 +140,7 @@ end
 
 ms = Memory::ScannerMain.new
 ms.parse_clargs
+ms.load_data_record
 ms.scan
+ms.save_data_record
 ms.summarize
