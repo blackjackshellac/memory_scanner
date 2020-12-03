@@ -4,6 +4,7 @@
 
 require_relative '../lib/logger'
 require_relative '../lib/proc_status_scanner'
+require_relative '../lib/proc_data_record'
 require 'optparse'
 require 'fileutils'
 require 'etc'
@@ -39,7 +40,7 @@ module Memory
 			@meminfo_summary = true
 			@record=""
 			@scanid=@now.strftime("#{ME}_%Y%m%d")
-			@data_record = nil
+			@data_records = nil
 			Procfs::Scanner.init({:logger=>@logger})
 		end
 
@@ -90,35 +91,20 @@ module Memory
 			}
 			optparser.parse!
 
+			@data_records = Procfs::Records.new(jsonf: @record, logger: @logger) unless @record.empty?
+
 		rescue OptionParser::InvalidOption => e
 			@logger.die "#{e.class}: #{e.message}"
 		end
 
 		def load_data_record
-			@data_record = nil
-			unless @record.empty?
-				json = nil
-				if File.exist?(@record)
-					@logger.info "Reading data record #{@record}"
-					json = File.read(@record)
-				end
-				@data_record = json.nil? ? {} : JSON.parse(json)
-			end
-		rescue => e
-			@logger.error "Failed to parse json data record #{@record}"
-			@logger.error "#{@e.class}: #{@e.message}"
-			@data_record = nil
-		ensure
-			@data_record
+			return if @data_records.nil?
+			@data_records.load
 		end
 
 		def save_data_record
-			return if @data_record.nil? || @record.empty?
-			json = JSON.pretty_generate(@data_record)
-			File.open(@record, "w") { |fd|
-				@logger.info "Writing data record #{@record}"
-				fd.puts json
-			}
+			return if @data_records.nil?
+			@data_records.save
 		end
 
 		def scan
