@@ -104,6 +104,7 @@ module Memory
 
 		def save_data_record
 			return if @data_records.nil?
+			@data_records.record(ts: @now, meminfo: @ps.meminfo)
 			@data_records.save
 		end
 
