@@ -3,7 +3,8 @@ module Procfs
 	class Records
 		def initialize(jsonf:, logger:)
 			@data = {
-				records: [] # Array of type DataRecord
+				meminfo: [], # Array of type MemInfoRecord
+				psinfo: []
 			}
 			@jsonf = jsonf
 			@json = nil
@@ -14,66 +15,39 @@ module Procfs
 			return unless File.exist?(@jsonf)
 			@logger.info "Loading json #{@jsonf}"
 			@json = File.read(@jsonf)
-			data = JSON.parse(@json, symbolize_names: true)
-			#puts data.inspect
-			@data = data
-			# data[:records].each { |dr|
-			# 	record = DataRecord.new(dr)
-			# 	@data[:records] << record
-			# }
+			@data = JSON.parse(@json, symbolize_names: true)
+			@data[:meminfo] ||= []
+			@data[:psinfo] ||= []
+			@data[:meminfo].map.with_index { |mi, idx|
+				@data[:meminfo][idx] = MemInfoRecord.json_create(mi)
+			}
 		rescue Errno::ENOENT => e
 
 		end
 
-		def save
+		def save(pretty: false)
 			@logger.info "Saving json #{@jsonf}"
 			File.open(@jsonf, "w") { |fd|
-				puts @data.inspect
-				fd.puts JSON.pretty_generate(@data)
+				fd.puts (pretty ? JSON.pretty_generate(self) : self.to_json)
 			}
 		end
 
 		def record(ts:, meminfo:)
-			@data[:records] << DataRecord.meminfo(ts, meminfo)
-		end
-	end
-
-	class DataRecord
-		KEYS=[ :ts, :total_mem, :free_mem, :avail_mem, :total_swap, :free_swap ]
-
-		def initialize(ts:, total_mem:, free_mem:, avail_mem:, total_swap: , free_swap:)
-			@ts = ts
-			@total_mem = total_mem
-			@free_mem = free_mem
-			@avail_mem = avail_mem
-			@total_swap = total_swap
-			@free_swap = free_swap
-		end
-
-		def self.meminfo(ts, meminfo)
-			DataRecord.new(
-				ts: ts,
-				total_mem: meminfo.memtotal,
-				free_mem: meminfo.memfree,
-				avail_mem: meminfo.memavailable,
-				total_swap: meminfo.swaptotal,
-				free_swap: meminfo.swapfree
-			)
+			@data[:meminfo] << MemInfoRecord.meminfo(ts, meminfo)
 		end
 
 		def to_json(*a)
 			{
-				ts: @ts.to_s,
-				total_mem: @total_mem,
-				free_mem: @free_mem,
-				avail_mem: @avail_mem,
-				total_swap: @total_swap,
-				free_swap: @free_swap
+				meminfo: @data[:meminfo],
+				psinfo: @data[:psinfo]
 			}.to_json(*a)
 		end
 
-		def self.json_create(dr)
-			puts dr.inspect
-		end
+		# def extract(meminfo: true, psinfo: false, key)
+		# 	@data[:meminfo].each_with_object([]) { |meminfo_record, values|
+		# 		next unless meminfo_record.key?(key.to_sym)
+		# 	}
+		# end
 	end
+
 end

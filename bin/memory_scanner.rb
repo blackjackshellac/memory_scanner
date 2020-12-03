@@ -97,15 +97,15 @@ module Memory
 			@logger.die "#{e.class}: #{e.message}"
 		end
 
-		def load_data_record
+		def load_data_records
 			return if @data_records.nil?
 			@data_records.load
 		end
 
-		def save_data_record
+		def save_data_records
 			return if @data_records.nil?
 			@data_records.record(ts: @now, meminfo: @ps.meminfo)
-			@data_records.save
+			@data_records.save(pretty: true)
 		end
 
 		def scan
@@ -127,7 +127,7 @@ end
 
 ms = Memory::ScannerMain.new
 ms.parse_clargs
-ms.load_data_record
+ms.load_data_records
 ms.scan
-ms.save_data_record
+ms.save_data_records
 ms.summarize

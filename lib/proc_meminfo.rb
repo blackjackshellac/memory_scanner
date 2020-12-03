@@ -124,4 +124,45 @@ module Procfs
 			stream.puts table.to_s
 		end
 	end
+
+	class MemInfoRecord < Hash
+		KEYS=[ :ts, :total_mem, :free_mem, :avail_mem, :total_swap, :free_swap ]
+		def initialize(**args)
+			# double splat holds the keyword arguments like a hash keyed by the symbols
+
+			KEYS.each { |key|
+				val=args[key]
+				self[key]=val
+			}
+		end
+
+		##
+		# create MemInfoRecord from MemInfo object for given timestamp (Time)
+		#
+		def self.meminfo(ts, meminfo)
+			MemInfoRecord.new(
+				ts: ts,
+				total_mem: meminfo.memtotal,
+				free_mem: meminfo.memfree,
+				avail_mem: meminfo.memavailable,
+				total_swap: meminfo.swaptotal,
+				free_swap: meminfo.swapfree
+			)
+		end
+
+		def to_json(*a)
+			{
+				ts: self[:ts].to_s,
+				total_mem: self[:total_mem],
+				free_mem: self[:free_mem],
+				avail_mem: self[:avail_mem],
+				total_swap: self[:total_swap],
+				free_swap: self[:free_swap]
+			}.to_json(*a)
+		end
+
+		def self.json_create(dr)
+			MemInfoRecord.new(dr)
+		end
+	end
 end
