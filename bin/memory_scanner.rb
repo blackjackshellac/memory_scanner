@@ -27,6 +27,8 @@ module Memory
       # Directory where the script lives, resolves symlinks
       MD=File.expand_path(File.dirname(File.realpath($0)))
 
+		MONITOR_INTERVAL=600
+
 		TMP=File.join("/var/tmp/#{ME}", Etc.getlogin)
 		FileUtils.mkdir_p(TMP)
 
@@ -34,14 +36,19 @@ module Memory
 		attr_reader :logger, :users, :ps
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
-			@now = Time.now
+			@now = now
 			@users = []
+			@monitor = nil
 			@process_tree = true
 			@meminfo_summary = true
 			@record=""
 			@scanid=@now.strftime("#{ME}_%Y%m%d")
 			@data_records = nil
 			Procfs::Scanner.init({:logger=>@logger})
+		end
+
+		def now
+			Time.now
 		end
 
 		def parse_clargs
@@ -57,12 +64,15 @@ module Memory
 					end
 				}
 
+				opts.on('-m', '--monitor [INTERVAL]', Integer, "") { |interval|
+					@monitor = interval.nil? ? MONITOR_INTERVAL : interval
+				}
+
 				# TODO it would be better if the data were updated on a running basis,
 				# but that would be a lot easier with an SQL database, perhaps this eventually
 				# https://github.com/sparklemotion/sqlite3-ruby
 				opts.on('-r', '--record [SCANID]', String, "Default scanid is updated daily #{@scanid}") { |scanid|
-					@scanid = scanid unless scanid.nil?
-					@record = File.join(TMP, @scanid+".json")
+					@record = setup_record(scanid)
 				}
 
 				opts.on('-P', '--[no-]process-tree', "Print the process tree to STDOUT") { |bool|
@@ -91,10 +101,20 @@ module Memory
 			}
 			optparser.parse!
 
+			# if monitoring make sure record is turned on
+			@record = setup_record(@scanid) if @monitor && @record.empty?
+
 			@data_records = Procfs::Records.new(jsonf: @record, logger: @logger) unless @record.empty?
 
 		rescue OptionParser::InvalidOption => e
 			@logger.die "#{e.class}: #{e.message}"
+		end
+
+		def setup_record(scanid)
+			@scanid = scanid unless scanid.nil?
+			record = File.join(TMP, @scanid+".json")
+			@logger.info "Recording to #{record}"
+			record
 		end
 
 		def load_data_records
@@ -102,20 +122,49 @@ module Memory
 			@data_records.load
 		end
 
-		def save_data_records
+		def save_data_records(pretty: true)
 			return if @data_records.nil?
 			@data_records.record(ts: @now, meminfo: @ps.meminfo)
-			@data_records.save(pretty: true)
+			@data_records.save(pretty: pretty)
 		end
 
 		def scan
-			@logger.debug "Scanning system at #{Time.now}"
-			@ps = Procfs::Scanner.new
-			@ps.scan(users: @users)
-		rescue => e
-			@logger.error "memory scan failed: #{e.message}"
-			puts e.backtrace.join("\n")
-			exit 1
+			# When set to true, if this thr is aborted by an exception,
+			# the raised exception will be re-raised in the main thread.
+			Thread.abort_on_exception = true
+			save_thread = nil
+			begin
+				load_data_records
+
+				loop do
+					@now = now
+					@logger.debug "Scanning system at #{@now}"
+					@ps = Procfs::Scanner.new
+					@ps.scan(users: @users)
+					Thread.handle_interrupt(Interrupt => :never) {
+						save_thread = Thread.new {
+							save_data_records(pretty: true)
+						}
+					}
+					break if @monitor.nil?
+					@logger.debug "Sleeping #{@monitor} seconds"
+					sleep @monitor
+					if save_thread.alive?
+						@logger.info "Waiting for save thread"
+						save_thread.join
+					end
+				end	# loop do
+			rescue Interrupt => e
+				@logger.warn "Caught interrupt"
+			rescue => e
+				@logger.error "memory scan failed: #{e.message}"
+				puts e.backtrace.join("\n")
+				exit 1
+			ensure
+				unless save_thread.nil?
+					save_thread.join if save_thread.alive?
+				end
+			end
 		end
 
 		def summarize
@@ -127,7 +176,5 @@ end
 
 ms = Memory::ScannerMain.new
 ms.parse_clargs
-ms.load_data_records
 ms.scan
-ms.save_data_records
 ms.summarize
