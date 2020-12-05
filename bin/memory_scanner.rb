@@ -4,11 +4,10 @@
 
 require_relative '../lib/logger'
 require_relative '../lib/proc_status_scanner'
-require_relative '../lib/proc_data_record'
+require_relative '../lib/proc_json_records'
 require 'optparse'
 require 'fileutils'
 require 'etc'
-require 'json'
 
 ##
 #
@@ -104,7 +103,7 @@ module Memory
 			# if monitoring make sure record is turned on
 			@record = setup_record(@scanid) if @monitor && @record.empty?
 
-			@data_records = Procfs::Records.new(jsonf: @record, logger: @logger) unless @record.empty?
+			@data_records = Procfs::JsonRecords.new(jsonf: @record, logger: @logger) unless @record.empty?
 
 		rescue OptionParser::InvalidOption => e
 			@logger.die "#{e.class}: #{e.message}"

@@ -1,6 +1,8 @@
 
+require 'json'
+
 module Procfs
-	class Records
+	class JsonRecords
 		def initialize(jsonf:, logger:)
 			@data = {
 				meminfo: [], # Array of type MemInfoRecord

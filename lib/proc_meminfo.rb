@@ -2,6 +2,7 @@
 require_relative 'proc_common'
 require_relative 'numeric_ext'
 require_relative 'tabular'
+require 'time'
 
 module Procfs
 	# $ cat /proc/meminfo
@@ -126,13 +127,22 @@ module Procfs
 	end
 
 	class MemInfoRecord < Hash
-		KEYS=[ :ts, :total_mem, :free_mem, :avail_mem, :total_swap, :free_swap ]
-		def initialize(**args)
-			# double splat holds the keyword arguments like a hash keyed by the symbols
+		KEYS=[ :total_mem, :free_mem, :avail_mem, :total_swap, :free_swap ]
 
+		attr_reader :total_mem, :free_mem, :avail_mem, :total_swap, :free_swap
+		##
+		# double splat holds the keyword arguments like a hash keyed by the symbols
+		# @param ts Time
+		# @param keyword_arks
+		#
+		def initialize(ts, **keyword_args)
+			ts = Time.parse(ts) if ts.class == String
+			raise ArgumentError, "ts is not a Time or String variable" unless ts.class == Time
+			@ts = ts
 			KEYS.each { |key|
-				val=args[key]
+				val=keyword_args[key]
 				self[key]=val
+				instance_variable_set("@#{key}", val)
 			}
 		end
 
@@ -140,8 +150,7 @@ module Procfs
 		# create MemInfoRecord from MemInfo object for given timestamp (Time)
 		#
 		def self.meminfo(ts, meminfo)
-			MemInfoRecord.new(
-				ts: ts,
+			MemInfoRecord.new(ts,
 				total_mem: meminfo.memtotal,
 				free_mem: meminfo.memfree,
 				avail_mem: meminfo.memavailable,
@@ -151,18 +160,18 @@ module Procfs
 		end
 
 		def to_json(*a)
-			{
-				ts: self[:ts].to_s,
-				total_mem: self[:total_mem],
-				free_mem: self[:free_mem],
-				avail_mem: self[:avail_mem],
-				total_swap: self[:total_swap],
-				free_swap: self[:free_swap]
-			}.to_json(*a)
+			h={
+				ts: @ts.to_s
+			}
+			KEYS.each { |key|
+				h[key]=self[key]
+			}
+			h.to_json(*a)
 		end
 
 		def self.json_create(dr)
-			MemInfoRecord.new(dr)
+			ts = Time.parse(dr[:ts])
+			MemInfoRecord.new(ts, dr)
 		end
 	end
 end
