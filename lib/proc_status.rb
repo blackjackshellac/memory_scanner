@@ -122,4 +122,32 @@ module Procfs
 			}
 		end
 	end
+
+	class StatusRecord < Hash
+		KEYS=[ :name, :pid, :ppid, :vmsize, :vmrss, :vmswap, :rss_total ]
+
+		def initialize(**keyword_args)
+			KEYS.each { |key|
+				val=keyword_args[key]
+				self[key]=val
+				instance_variable_set("@#{key}", val)
+			}
+		end
+
+		def to_json(*a)
+			KEYS.each_with_object({}) { |key,h|
+				h[key]=self[key]
+			}.to_json(*a)
+		end
+
+		def self.create(status)
+			h={}
+			KEYS.each.each_with_object(h) { |key, obj|
+				obj[key] = status.fields[key]
+			}
+			h[:rss_total] = status.get_rss_total
+			StatusRecord.new(h)
+		end
+	end
+
 end

@@ -11,7 +11,7 @@ module Procfs
 			@@logger = opts[:logger]
 		end
 
-		attr_reader :pids, :meminfo, :root
+		attr_reader :pids, :meminfo, :root, :pid_status
 		def initialize
 			# array of pids for all processes scanned
 			@pids = []
@@ -118,6 +118,23 @@ module Procfs
 			}.each { |root_status|
 				root_status.print_tree(stream)
 			}
+		end
+
+		##
+		# mem_total = 16G
+		# percent = 10%
+		# processes with rss_total (including children) > 10% of 16G (1.6G)
+		def filter_statuses(mem_total, percent)
+			raise ArgumentError, "Invalid value for percent" if percent < 0 || percent > 100
+			max=mem_total*percent/100
+			filter=[]
+			@root.sort_by { |root_status|
+				root_status.get_rss_total
+			}.each_with_object(filter) { |root_status, array|
+				array << root_status if root_status.rss_total > max
+			}
+			puts "FILTER_STATUSES> "+filter.inspect
+			filter
 		end
 
 	end

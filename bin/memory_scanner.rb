@@ -123,7 +123,7 @@ module Memory
 
 		def save_data_records(pretty: true)
 			return if @data_records.nil?
-			@data_records.record(ts: @now, meminfo: @ps.meminfo)
+			@data_records.record(ts: @now, meminfo: @ps.meminfo, pid_status: @ps.pid_status)
 			@data_records.save(pretty: pretty)
 		end
 

@@ -149,7 +149,7 @@ module Procfs
 		##
 		# create MemInfoRecord from MemInfo object for given timestamp (Time)
 		#
-		def self.meminfo(ts, meminfo)
+		def self.create(ts, meminfo)
 			MemInfoRecord.new(ts,
 				total_mem: meminfo.memtotal,
 				free_mem: meminfo.memfree,
@@ -169,8 +169,10 @@ module Procfs
 			h.to_json(*a)
 		end
 
-		def self.json_create(dr)
-			ts = Time.parse(dr[:ts])
+		def self.json_create(ts, dr)
+			dr.keys.each { |key|
+				dr[key.to_sym] = dr.delete(key)
+			}
 			MemInfoRecord.new(ts, dr)
 		end
 	end
