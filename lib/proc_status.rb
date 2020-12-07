@@ -142,8 +142,8 @@ module Procfs
 
 		def self.create(status)
 			h={}
-			KEYS.each.each_with_object(h) { |key, obj|
-				obj[key] = status.fields[key]
+			KEYS.each { |key|
+				h[key] = status.fields[key]
 			}
 			h[:rss_total] = status.get_rss_total
 			StatusRecord.new(h)

@@ -43,7 +43,6 @@ module Memory
 			@record=""
 			@scanid=@now.strftime("#{ME}_%Y%m%d")
 			@data_records = nil
-			Procfs::Scanner.init({:logger=>@logger})
 		end
 
 		def now
@@ -123,7 +122,9 @@ module Memory
 
 		def save_data_records(pretty: true)
 			return if @data_records.nil?
-			@data_records.record(ts: @now, meminfo: @ps.meminfo, pid_status: @ps.pid_status)
+
+			statuses = @ps.filter_statuses(percent_mem: 5)
+			@data_records.record(ts: @now, meminfo: @ps.meminfo, statuses: statuses)
 			@data_records.save(pretty: pretty)
 		end
 
@@ -138,7 +139,7 @@ module Memory
 				loop do
 					@now = now
 					@logger.debug "Scanning system at #{@now}"
-					@ps = Procfs::Scanner.new
+					@ps = Procfs::Scanner.new(logger: @logger)
 					@ps.scan(users: @users)
 					Thread.handle_interrupt(Interrupt => :never) {
 						save_thread = Thread.new {

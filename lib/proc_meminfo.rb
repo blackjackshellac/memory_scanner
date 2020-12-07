@@ -135,10 +135,7 @@ module Procfs
 		# @param ts Time
 		# @param keyword_arks
 		#
-		def initialize(ts, **keyword_args)
-			ts = Time.parse(ts) if ts.class == String
-			raise ArgumentError, "ts is not a Time or String variable" unless ts.class == Time
-			@ts = ts
+		def initialize(**keyword_args)
 			KEYS.each { |key|
 				val=keyword_args[key]
 				self[key]=val
@@ -149,8 +146,8 @@ module Procfs
 		##
 		# create MemInfoRecord from MemInfo object for given timestamp (Time)
 		#
-		def self.create(ts, meminfo)
-			MemInfoRecord.new(ts,
+		def self.create(meminfo)
+			MemInfoRecord.new(
 				total_mem: meminfo.memtotal,
 				free_mem: meminfo.memfree,
 				avail_mem: meminfo.memavailable,
@@ -160,20 +157,16 @@ module Procfs
 		end
 
 		def to_json(*a)
-			h={
-				ts: @ts.to_s
-			}
-			KEYS.each { |key|
+			KEYS.each_with_object({}) { |key, h|
 				h[key]=self[key]
-			}
-			h.to_json(*a)
+			}.to_json(*a)
 		end
 
-		def self.json_create(ts, dr)
+		def self.json_create(dr)
 			dr.keys.each { |key|
 				dr[key.to_sym] = dr.delete(key)
 			}
-			MemInfoRecord.new(ts, dr)
+			MemInfoRecord.new(dr)
 		end
 	end
 end

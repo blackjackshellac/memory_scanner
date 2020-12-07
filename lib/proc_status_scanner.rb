@@ -7,26 +7,22 @@ require_relative 'proc_meminfo'
 module Procfs
 	class Scanner
 
-		def self.init(opts={:logger=>logger})
-			@@logger = opts[:logger]
-		end
-
 		attr_reader :pids, :meminfo, :root, :pid_status
-		def initialize
+		def initialize(logger:)
 			# array of pids for all processes scanned
 			@pids = []
 			# array of top level process status objects
 			@root = []
 			@pid_status = {}
 			@meminfo = Procfs::Meminfo.new
-			@@logger.debug @meminfo.inspect
+			@logger = logger
 		end
 
 		def getuseruid(user)
 			begin
 				return Etc.getpwnam(user).uid
 			rescue => e
-				@@logger.warn "#{e.class}: #{e.to_s}"
+				@logger.warn "#{e.class}: #{e.to_s}"
 			end
 			nil
 		end
@@ -76,7 +72,7 @@ module Procfs
 				pid_status=Procfs::Status.new(pid)
 				@pid_status[pid] = pid_status
 
-				# @@logger.debug "%s: pid=%d name=%s ppid=%s vmsize=%s" %
+				# @logger.debug "%s: pid=%d name=%s ppid=%s vmsize=%s" %
 				# 	[
 				# 		piddir,
 				# 		pid_status.pid,
@@ -124,16 +120,18 @@ module Procfs
 		# mem_total = 16G
 		# percent = 10%
 		# processes with rss_total (including children) > 10% of 16G (1.6G)
-		def filter_statuses(mem_total, percent)
-			raise ArgumentError, "Invalid value for percent" if percent < 0 || percent > 100
-			max=mem_total*percent/100
+		def filter_statuses(percent_mem:)
+			raise ArgumentError, "Invalid value for percent" if percent_mem < 0 || percent_mem > 100
+			max=@meminfo.memtotal*percent_mem/100
 			filter=[]
-			@root.sort_by { |root_status|
-				root_status.get_rss_total
-			}.each_with_object(filter) { |root_status, array|
-				array << root_status if root_status.rss_total > max
+			@pid_status.sort_by { |pid, status|
+				-status.get_rss_total
+			}.each_with_object(filter) { |pid_status, array|
+				# pid_status is a key value array
+				status=pid_status[1]
+				array << status if status.get_rss_total > max
 			}
-			puts "FILTER_STATUSES> "+filter.inspect
+			@logger.debug "FILTER_STATUSES> "+filter.inspect
 			filter
 		end
 

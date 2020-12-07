@@ -31,23 +31,24 @@ module Procfs
 			@json = File.read(@jsonf)
 			@data = JSON.parse(@json)
 
-			puts "data=#{@data.inspect}"
+			@logger.debug "data=#{@data.inspect}"
 
 			# convert timestamps to Time objects
 			@data.keys.each { |ts|
 				@data[Time.parse(ts)] = @data.delete ts
 			}
 			@data.map { |ts, record|
-				record[MEMINFO] = MemInfoRecord.json_create(ts, record[MEMINFO]) if record.key?(MEMINFO)
+				record[MEMINFO] = MemInfoRecord.json_create(record[MEMINFO]) if record.key?(MEMINFO)
 				statuses = JsonStatusRecords.new(ts)
-				if record.key?(STATUSES)
-					statuses.load(record[STATUSES])
-				end
-				record[STATUSES] = statuses
+				statuses.load(record[STATUSES])
+				record[STATUSES] = statuses unless statuses.empty?
 			}
 
-		rescue Errno::ENOENT => e
-
+		rescue => e
+			e.backtrace.each { |line|
+				@logger.error line
+			}
+			@logger.die "#{e.class}: #{e.message}"
 		end
 
 		def save(pretty: false)
@@ -57,13 +58,13 @@ module Procfs
 			}
 		end
 
-		def record(ts:, meminfo:, pid_status:)
+		def record(ts:, meminfo:, statuses:)
 			tss=ts.to_s
 			@logger.debug "Recording #{meminfo.inspect} at #{tss}"
 			@data[tss]={}
-			@data[tss][MEMINFO]=MemInfoRecord.create(ts, meminfo)
+			@data[tss][MEMINFO]=MemInfoRecord.create(meminfo)
 			@data[tss][STATUSES]=JsonStatusRecords.new(ts)
-			pid_status.each_pair { |pid, status|
+			statuses.each { |status|
 				@data[tss][STATUSES] << StatusRecord.create(status)
 			}
 		end
@@ -74,7 +75,7 @@ module Procfs
 			@data.each_with_object(hash) { |(ts, record), h|
 				tss=ts.to_s
 				h[tss] = {}
-				puts record[MEMINFO].inspect
+				@logger.debug "MEMINFO record="+record[MEMINFO].inspect
 				h[tss][MEMINFO]=record[MEMINFO] if record.key?(MEMINFO)
 				h[tss][STATUSES]=record[STATUSES] if record.key?(STATUSES)
 			}
@@ -91,10 +92,13 @@ module Procfs
 	class JsonStatusRecords < Array
 		attr_reader :ts
 		def initialize(ts)
+			ts = Time.parse(ts) if ts.class == String
+			raise ArgumentError, "ts is not a Time or String variable" unless ts.class == Time
 			@ts = ts
 		end
 
 		def load(statuses)
+			return if statuses.nil?
 			statuses.each { |status|
 				status.keys.each { |key|
 					# convert status keys to symbols
