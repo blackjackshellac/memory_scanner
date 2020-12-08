@@ -73,6 +73,7 @@ module Procfs
 			}
 			@uid = @ids[:uid][:real]||-1
 			@username = @uid == -1 ? "unknown uid" : Etc.getpwuid(@uid).name
+			@fields[:username] = @username
 			@gid = @ids[:gid][:real]||-1
 			@group = @gid == -1 ? "unknown gid" : Etc.getgrgid(@gid).name
 		end
@@ -124,7 +125,7 @@ module Procfs
 	end
 
 	class StatusRecord < Hash
-		KEYS=[ :name, :pid, :ppid, :vmsize, :vmrss, :vmswap, :rss_total ]
+		KEYS=[ :name, :username, :pid, :ppid, :vmsize, :vmrss, :vmswap, :rss_total ]
 
 		def initialize(**keyword_args)
 			KEYS.each { |key|
