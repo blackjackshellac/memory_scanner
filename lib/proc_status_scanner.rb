@@ -59,9 +59,9 @@ module Procfs
 			uids.empty? || uids.include?(uid)
 		end
 
-		def scan(opts={:users=>[]})
+		def proc_scan(users)
 
-			uids = get_uids(opts[:users])
+			uids = get_uids(users)
 
 			@pid_status = {}
 			Procfs::Common.pid_dirs { |piddir|
@@ -71,15 +71,6 @@ module Procfs
 				@pids << pid
 				pid_status=Procfs::Status.new(pid)
 				@pid_status[pid] = pid_status
-
-				# @logger.debug "%s: pid=%d name=%s ppid=%s vmsize=%s" %
-				# 	[
-				# 		piddir,
-				# 		pid_status.pid,
-				# 		pid_status.name,
-				# 		pid_status.ppid,
-				# 		pid_status.vmsize
-				# 	]
 			}
 
 			grow_process_tree

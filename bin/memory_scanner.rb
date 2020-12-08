@@ -35,14 +35,15 @@ module Memory
 		attr_reader :logger, :users, :ps
 		def initialize
 			@logger = Logger.create(STDERR, Logger::INFO)
-			@now = now
+			@ts = now
 			@users = []
 			@monitor = nil
 			@process_tree = true
 			@meminfo_summary = true
 			@record=""
-			@scanid=@now.strftime("#{ME}_%Y%m%d")
+			@scanid=@ts.strftime("#{ME}_%Y%m%d")
 			@data_records = nil
+			@email = ENV['NOTIFY_EMAIL']||nil
 		end
 
 		def now
@@ -64,6 +65,10 @@ module Memory
 
 				opts.on('-m', '--monitor [INTERVAL]', Integer, "") { |interval|
 					@monitor = interval.nil? ? MONITOR_INTERVAL : interval
+				}
+
+				opts.on('-e', '--email EMAIL', String, "Notification email, can be set with NOTIFY_EMAIL env var") { |email|
+					@email = email
 				}
 
 				# TODO it would be better if the data were updated on a running basis,
@@ -122,38 +127,57 @@ module Memory
 
 		def save_data_records(pretty: true)
 			return if @data_records.nil?
-
+			@logger.debug "Saving data_records"
 			statuses = @ps.filter_statuses(percent_mem: 5)
-			@data_records.record(ts: @now, meminfo: @ps.meminfo, statuses: statuses)
+			@data_records.record(ts: @ts, meminfo: @ps.meminfo, statuses: statuses)
 			@data_records.save(pretty: pretty)
+			@logger.debug "Done saving data_records"
+		end
+
+		def monitor_wait(save_thread)
+			return false if @monitor.nil?
+			@logger.debug "Sleeping #{@monitor} seconds"
+			sleep @monitor
+			if save_thread.alive?
+				@logger.info "Waiting for save thread"
+				save_thread.join
+			end
+			true
+		end
+
+		def thread_save(pretty: false)
+			# When set to true, if this thr is aborted by an exception,
+			# the raised exception will be re-raised in the main thread.
+			save_thread = nil
+			Thread.abort_on_exception = true
+			Thread.handle_interrupt(Interrupt => :never) {
+				save_thread = Thread.new {
+					save_data_records(pretty: pretty)
+				}
+			}
+			save_thread
 		end
 
 		def scan
-			# When set to true, if this thr is aborted by an exception,
-			# the raised exception will be re-raised in the main thread.
-			Thread.abort_on_exception = true
+			@ts = now
+			@logger.debug "Scanning system at #{@ts}"
+			@ps = Procfs::Scanner.new(logger: @logger)
+			@ps.proc_scan(@users)
+		end
+
+		def run
 			save_thread = nil
 			begin
 				load_data_records
 
 				loop do
-					@now = now
-					@logger.debug "Scanning system at #{@now}"
-					@ps = Procfs::Scanner.new(logger: @logger)
-					@ps.scan(users: @users)
-					Thread.handle_interrupt(Interrupt => :never) {
-						save_thread = Thread.new {
-							save_data_records(pretty: true)
-						}
-					}
-					break if @monitor.nil?
-					@logger.debug "Sleeping #{@monitor} seconds"
-					sleep @monitor
-					if save_thread.alive?
-						@logger.info "Waiting for save thread"
-						save_thread.join
-					end
-				end	# loop do
+					scan()
+
+					save_thread = thread_save(pretty: true)
+
+					break unless monitor_wait(save_thread)
+				end
+
 			rescue Interrupt => e
 				@logger.warn "Caught interrupt"
 			rescue => e
@@ -176,5 +200,5 @@ end
 
 ms = Memory::ScannerMain.new
 ms.parse_clargs
-ms.scan
+ms.run
 ms.summarize

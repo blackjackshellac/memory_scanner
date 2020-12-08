@@ -163,9 +163,7 @@ module Procfs
 		end
 
 		def self.json_create(dr)
-			dr.keys.each { |key|
-				dr[key.to_sym] = dr.delete(key)
-			}
+			dr.transform_keys!(&:to_sym)
 			MemInfoRecord.new(dr)
 		end
 	end
