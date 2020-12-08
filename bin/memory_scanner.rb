@@ -5,6 +5,7 @@
 require_relative '../lib/logger'
 require_relative '../lib/proc_status_scanner'
 require_relative '../lib/proc_json_records'
+require_relative '../lib/emailer'
 require 'optparse'
 require 'fileutils'
 require 'etc'
@@ -165,18 +166,27 @@ module Memory
 			@ps.proc_scan(@users)
 		end
 
+		def notify(addr:)
+			return if addr.nil?
+
+			@logger.info "Notify #{addr}"
+			emailer=Notify::Emailer.new(to: addr, subject:"foo")
+		end
+
 		def run
 			save_thread = nil
 			begin
 				load_data_records
 
-				loop do
+				loop {
 					scan()
 
 					save_thread = thread_save(pretty: true)
 
+					notify(addr: @email)
+
 					break unless monitor_wait(save_thread)
-				end
+				}
 
 			rescue Interrupt => e
 				@logger.warn "Caught interrupt"
