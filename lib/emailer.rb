@@ -18,30 +18,45 @@ end
 # mail.deliver!
 
 module Notify
-	class Emailer
+	class Emailer < Mail::Message
 
-		attr_reader :mail
-		def initialize(to:, from: nil, subject:)
-			@mail = Mail.new
-			@mail.to = to
-			@mail.from = from.nil? ? @to : from
-			@mail.subject = subject
+		def initialize(*args)
+			super(args)
 		end
 
-		def setup(to:, from: nil, subject:, cc: nil, bcc: nil, comments: nil, keywords: nil, reply_to: nil, body:, files: [])
-			@mail.to = to
-			@mail.from = from.nil? ? to : from
-			@mail.subject = subject
-			@mail.body = body
+		def setup(to:, from: nil, subject:, cc: nil, bcc: nil, comments: nil, keywords: nil, reply_to: nil, body:nil, files: [])
+			self.to = to
+			self.from = from.nil? ? to : from
+			self.subject = subject
+			self.body = body
 
-			@mail.cc = cc unless cc.nil?
-			@mail.bcc = bcc unless bcc.nil?
-			@mail.comments = comments unless comments.nil?
-			@mail.keywords = keywords unless keywords.nil?
-			@mai.reply_to = reply_to unless reply_to.nil?
+			self.cc = cc unless cc.nil?
+			self.bcc = bcc unless bcc.nil?
+			self.comments = comments unless comments.nil?
+			self.keywords = keywords unless keywords.nil?
+			self.reply_to = reply_to unless reply_to.nil?
 
+			attach(files)
+		end
+
+		def attach(files)
 			# TODO deal with file attachments
-			
+			files = [ files ] if files.class == String
+			files.each { |file|
+				self.add_file(file)
+			}
+		end
+
+		def send(body: nil, files:[], delivery_method: :sendmail)
+
+			if block_given?
+				self.body = "#{yield}"
+			elsif !body.nil
+				self.body = body
+			end
+			attach(files)
+			self.delivery_method delivery_method
+			self.deliver!
 		end
 	end
 end

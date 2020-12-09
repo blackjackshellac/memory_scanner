@@ -170,7 +170,19 @@ module Memory
 			return if addr.nil?
 
 			@logger.info "Notify #{addr}"
-			emailer=Notify::Emailer.new(to: addr, subject:"foo")
+			emailer=Notify::Emailer.new
+			emailer.setup(to: addr, subject:"foo")
+
+			emailer.attach("/var/tmp/memory_scanner/steeve/memory_scanner_20201209.json")
+			return
+			emailer.send {
+			<<-BODY
+				Just testing this thing.
+
+				Add a bit more text here
+			BODY
+			}
+
 		end
 
 		def run
