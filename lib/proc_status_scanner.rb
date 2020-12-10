@@ -108,6 +108,14 @@ module Procfs
 			}
 		end
 
+		def find_memhogs(highmem: 40)
+			memhog=[]
+			@pid_status.each_pair { |pid, status|
+				memhog << status if status.test_totalrss(highmem: highmem, totalmem: meminfo.memtotal)
+			}
+			memhog
+		end
+
 		##
 		# mem_total = 16G
 		# percent = 10%

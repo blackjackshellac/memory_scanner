@@ -103,12 +103,24 @@ module Procfs
 			@rss_total
 		end
 
+		##
+		# @param Integer highmem percentage memory use to consider
+		# @param Integer totalmem total system memory
+		# @returns Boolean true if percentage totalrss > highmem
+		def test_totalrss(highmem:100, totalmem:)
+			((get_rss_total*100/totalmem) > highmem)
+		end
+
 		def summary(tabs)
 			@rss_total = get_rss_total
 			return "%s+ %s:%d> %s:%d TotalRss=[%s] VmSize=[%s] VmRss=[%s]%s" % [ tabs, @name, @pid, @username, @uid,
 			 	@rss_total.to_bibyte, @vmsize.to_bibyte, @vmrss.to_bibyte, vmswap.to_i <= 0 ? "" : " VmSwap=[#{@vmswap.to_bibyte}]"]
 		end
 
+		def to_s
+			"%s: (%s)" % [ @name, @rss_total.to_bibyte ]
+		end
+		
 		##
 		# print summary of process, and recursively for children, sorted by total
 		# rss memory usage

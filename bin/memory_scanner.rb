@@ -46,6 +46,7 @@ module Memory
 			@scanid=@ts.strftime("#{ME}_%Y%m%d")
 			@data_records = nil
 			@email = ENV['NOTIFY_EMAIL']||nil
+			@process_notify = 33 # notify when a process uses more than 40% of total ram
 		end
 
 		def now
@@ -170,6 +171,17 @@ module Memory
 		def notify(addr:)
 			return if addr.nil?
 
+			memhogs = @ps.find_memhogs(highmem: @process_notify)
+
+			return if memhogs.empty?
+
+			sep="+"*132
+			hog_entry = memhogs.each_with_object([]) { |status,hogs|
+				hogs << status.to_s
+			}.join("\n")
+
+			hog_entry = "Memory Hogs ( > #{@process_notify}% total memory)\n#{hog_entry}\n#{sep}"
+
 			@logger.info "Notify #{addr}"
 			emailer=Notify::Emailer.new
 			#emailer.setup(to: addr, subject:"foo")
@@ -186,8 +198,10 @@ module Memory
 			body=<<~BODY
 				#{ME} #{@ts.to_s}
 
+				#{hog_entry}
+
 				#{meminfo.string}
-				#{"+"*80}
+				#{sep}
 				#{processes.string}
 			BODY
 
@@ -196,7 +210,7 @@ module Memory
 			}
 			emailer.html_part {
 				content_type 'text/html; charset=UTF-8'
-	    		body "<pre>#{body}</pre>"
+				body "<pre style='font-family: \"Courier New\", Courier, mono; font-size: 12px;'>#{body}</pre>"
 			}
 			emailer.send
 
