@@ -20,6 +20,7 @@ module Memory
 	include Procfs
 
 	class ScannerMain
+		HOST=%x/hostname -s/.strip
 		## Process name with extension
       MERB=File.basename($0)
       ## Process name without .rb extension
@@ -171,17 +172,33 @@ module Memory
 
 			@logger.info "Notify #{addr}"
 			emailer=Notify::Emailer.new
-			emailer.setup(to: addr, subject:"foo")
+			#emailer.setup(to: addr, subject:"foo")
+			emailer.to = addr
+			emailer.from = addr
+			emailer.subject = "#{HOST}: #{ME} report"
+			#emailer.attach("/var/tmp/memory_scanner/steeve/memory_scanner_20201209.json")
 
-			emailer.attach("/var/tmp/memory_scanner/steeve/memory_scanner_20201209.json")
-			return
-			emailer.send {
-			<<-BODY
-				Just testing this thing.
+			processes = StringIO.new
+			meminfo = StringIO.new
+			@ps.meminfo.summary(stream: meminfo)
+			@ps.print_process_tree(stream: processes, descending: true)
 
-				Add a bit more text here
+			body=<<~BODY
+				#{ME} #{@ts.to_s}
+
+				#{meminfo.string}
+				#{"+"*80}
+				#{processes.string}
 			BODY
+
+			emailer.text_part {
+				body "#{body}"
 			}
+			emailer.html_part {
+				content_type 'text/html; charset=UTF-8'
+	    		body "<pre>#{body}</pre>"
+			}
+			emailer.send
 
 		end
 
@@ -214,8 +231,8 @@ module Memory
 		end
 
 		def summarize
-			@ps.print_process_tree(STDOUT) if @process_tree
-			@ps.meminfo.summary(STDOUT) if @meminfo_summary
+			@ps.print_process_tree() if @process_tree
+			@ps.meminfo.summary() if @meminfo_summary
 		end
 	end
 end

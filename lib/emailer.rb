@@ -51,8 +51,8 @@ module Notify
 
 			if block_given?
 				self.body = "#{yield}"
-			elsif !body.nil
-				self.body = body
+			# elsif !self.body.nil
+			# 	self.body = body
 			end
 			attach(files)
 			self.delivery_method delivery_method

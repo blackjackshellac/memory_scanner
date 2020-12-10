@@ -99,9 +99,10 @@ module Procfs
 		##
 		# print process tree for each top level process sorted by total rss
 		#
-		def print_process_tree(stream)
+		def print_process_tree(stream: STDOUT, descending: false)
 			@root.sort_by { |root_status|
-				root_status.get_rss_total
+				tot=root_status.get_rss_total
+				descending ? -tot : tot
 			}.each { |root_status|
 				root_status.print_tree(stream)
 			}
