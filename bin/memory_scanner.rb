@@ -46,7 +46,7 @@ module Memory
 			@scanid=@ts.strftime("#{ME}_%Y%m%d")
 			@data_records = nil
 			@email = ENV['NOTIFY_EMAIL']||nil
-			@process_notify = 33 # notify when a process uses more than 40% of total ram
+			@threshold_memhog = 33 # notify when a process uses more than 40% of total ram
 		end
 
 		def now
@@ -168,25 +168,21 @@ module Memory
 			@ps.proc_scan(@users)
 		end
 
-		def notify(addr:)
-			return if addr.nil?
+		def add_section(title:"", section:nil, sep:"+"*132)
+			title="\n#{title}\n" unless title.empty?
+			(section.nil? || section.empty?) ? "" : "%s%s\n%s\n" % [ title, section, sep ]
+		end
 
-			memhogs = @ps.find_memhogs(highmem: @process_notify)
+		##
+		# sections = Hash with keys title, section
+		def notify(to:, from: nil, sections:{})
+			return if to.nil?
 
-			return if memhogs.empty?
-
-			sep="+"*132
-			hog_entry = memhogs.each_with_object([]) { |status,hogs|
-				hogs << status.to_s
-			}.join("\n")
-
-			hog_entry = "Memory Hogs ( > #{@process_notify}% total memory)\n#{hog_entry}\n#{sep}"
-
-			@logger.info "Notify #{addr}"
+			@logger.info "Notify #{to}"
 			emailer=Notify::Emailer.new
-			#emailer.setup(to: addr, subject:"foo")
-			emailer.to = addr
-			emailer.from = addr
+			#emailer.setup(to: to, subject:"foo")
+			emailer.to = to
+			emailer.from = from.nil? ? to : from
 			emailer.subject = "#{HOST}: #{ME} report"
 			#emailer.attach("/var/tmp/memory_scanner/steeve/memory_scanner_20201209.json")
 
@@ -195,15 +191,16 @@ module Memory
 			@ps.meminfo.summary(stream: meminfo)
 			@ps.print_process_tree(stream: processes, descending: true)
 
-			body=<<~BODY
-				#{ME} #{@ts.to_s}
+			sep="+"*132
 
-				#{hog_entry}
+			body="#{ME} Report -  #{@ts.to_s}\n\n"
 
-				#{meminfo.string}
-				#{sep}
-				#{processes.string}
-			BODY
+			sections.each_pair { |title,section|
+				body += add_section(title: title, section:section)
+			}
+
+			body += add_section(title: "Summary /proc/meminfo", section:meminfo.string)
+			body += add_section(title: "Summary /proc/*/status", section:processes.string)
 
 			emailer.text_part {
 				body "#{body}"
@@ -226,7 +223,14 @@ module Memory
 
 					save_thread = thread_save(pretty: true)
 
-					notify(addr: @email)
+					memhogs = @ps.find_memhogs(highmem: @threshold_memhog)
+					swaphogs = nil
+
+					sections={
+						"Mem hogs report" => memhogs,
+						"Swap hogs report" => swaphogs
+					}
+					notify(to: @email, sections: sections)
 
 					break unless monitor_wait(save_thread)
 				}

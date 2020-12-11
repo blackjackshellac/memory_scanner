@@ -107,7 +107,7 @@ module Procfs
 		# @param Integer highmem percentage memory use to consider
 		# @param Integer totalmem total system memory
 		# @returns Boolean true if percentage totalrss > highmem
-		def test_totalrss(highmem:100, totalmem:)
+		def is_memhog(highmem:100, totalmem:)
 			((get_rss_total*100/totalmem) > highmem)
 		end
 
@@ -120,7 +120,7 @@ module Procfs
 		def to_s
 			"%s: (%s)" % [ @name, @rss_total.to_bibyte ]
 		end
-		
+
 		##
 		# print summary of process, and recursively for children, sorted by total
 		# rss memory usage

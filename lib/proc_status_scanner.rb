@@ -109,11 +109,20 @@ module Procfs
 		end
 
 		def find_memhogs(highmem: 40)
-			memhog=[]
+			memhogs=[]
 			@pid_status.each_pair { |pid, status|
-				memhog << status if status.test_totalrss(highmem: highmem, totalmem: meminfo.memtotal)
+				memhogs << status if status.is_memhog(highmem: highmem, totalmem: meminfo.memtotal)
 			}
-			memhog
+
+			hog_entry = nil
+			unless memhogs.empty?
+				hog_entry = memhogs.each_with_object([]) { |status,hogs|
+					hogs << status.to_s
+				}.join("\n")
+
+				hog_entry = "Memory Hogs ( > #{@process_notify}% total memory)\n#{hog_entry}"
+			end
+			hog_entry
 		end
 
 		##
