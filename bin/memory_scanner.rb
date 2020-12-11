@@ -178,6 +178,11 @@ module Memory
 		def notify(to:, from: nil, sections:{})
 			return if to.nil?
 
+			# delete sections that are nil or empty
+			sections.delete_if { |k, section| section.nil? || section.empty? }
+			# don't notify if there are no sections to report
+			return if sections.empty?
+
 			@logger.info "Notify #{to}"
 			emailer=Notify::Emailer.new
 			#emailer.setup(to: to, subject:"foo")
