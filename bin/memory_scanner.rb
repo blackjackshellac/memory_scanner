@@ -28,6 +28,8 @@ module Memory
       # Directory where the script lives, resolves symlinks
       MD=File.expand_path(File.dirname(File.realpath($0)))
 
+		DEF_CONFIG = File.join(MD, ME+".json")
+
 		MONITOR_INTERVAL=600
 
 		TMP=File.join("/var/tmp/#{ME}", Etc.getlogin)
@@ -42,60 +44,127 @@ module Memory
 			@monitor = nil
 			@process_tree = true
 			@meminfo_summary = true
-			@record=""
+			@record=false
 			@scanid=@ts.strftime("#{ME}_%Y%m%d")
 			@data_records = nil
 			@email = ENV['NOTIFY_EMAIL']||nil
 			@threshold_memhog = 33 # notify when a process uses more than 40% of total ram
+
+			# first notificaiton will always go out
+			@last_notification = Time.at(0)
+			@wait_notify = 15*60	# 15 minutes
+
+			@config = nil
+			@config_hash = {}
 		end
 
 		def now
 			Time.now
 		end
 
+		def load_config
+			return if @config.nil?
+
+			@logger.info "Loading #{@config}"
+			json = File.read(@config)
+			cfg = JSON.parse(json, symbolize_names: true)
+			cfg.each_pair { |key,val|
+				process_arg(key, val)
+			}
+		rescue Errno::ENOENT => e
+			@logger.warn "Failed to load config #{@config}, one will be created with the given options"
+		rescue => e
+			@logger.die "#{e.class}: Failed to load config #{@config} [#{e.message}]"
+		end
+
+		def save_config
+			return if @config.nil?
+			File.open(@config, "w+") { |fd|
+				@logger.info "Saving config #{@config}"
+				fd.puts(JSON.pretty_generate(@config_hash))
+			}
+		rescue => e
+			@logger.die "Failed to save config #{@config}"
+		end
+
+		def process_arg(key, val=nil)
+			case key.to_sym
+			when :users
+				if val.include?(":all")
+					@users = [ :all ]
+				else
+					@users.concat(val)
+					@users.uniq!
+				end
+				val = @users
+			when :monitor
+				@monitor = val.nil? ? MONITOR_INTERVAL : val
+				val = @monitor
+			when :email
+				@email = val
+			when :process_tree
+				@process_tree = val
+			when :meminfo_summary
+				@meminfo_summary = val
+			when :quiet
+				process_arg(:process_tree, false)
+				process_arg(:meminfo_summary, false)
+			when :debug
+				@logger.level = Logger::DEBUG
+				val = true
+			when :scanid
+				@scanid = val unless val.nil?
+				val = @scanid
+			when :record
+				@record = val
+			else
+				@logger.error "Unknown configuration #{key.to_s}"
+			end
+			@config_hash[key] = val.nil? ? true : val
+		end
+
 		def parse_clargs
 			optparser=OptionParser.new { |opts|
 				opts.banner = "#{MERB} [options]\n"
 
-				opts.on('-u', '--users USERS', Array, "List of users, default is current user (use :all for all users)") { |users|
-					if users.include?(":all")
-						@users = [ :all ]
-					else
-						@users.concat(users)
-						@users.uniq!
-					end
+				opts.on('-c', '--config [CONFIG]', String, "Load config from json") { |config|
+					@config = config.nil? ? DEF_CONFIG : config
 				}
 
-				opts.on('-m', '--monitor [INTERVAL]', Integer, "") { |interval|
-					@monitor = interval.nil? ? MONITOR_INTERVAL : interval
+				opts.on('-u', '--users USERS', Array, "List of users, default is current user (use :all for all users)") { |users|
+					process_arg(:users, users)
+				}
+
+				opts.on('-m', '--monitor [INTERVAL]', Integer, "Run a scan periocially, def is #{MONITOR_INTERVAL} secs") { |interval|
+					process_arg(:monitor, interval)
 				}
 
 				opts.on('-e', '--email EMAIL', String, "Notification email, can be set with NOTIFY_EMAIL env var") { |email|
-					@email = email
+					process_arg(:email, email)
 				}
 
 				# TODO it would be better if the data were updated on a running basis,
 				# but that would be a lot easier with an SQL database, perhaps this eventually
 				# https://github.com/sparklemotion/sqlite3-ruby
 				opts.on('-r', '--record [SCANID]', String, "Default scanid is updated daily #{@scanid}") { |scanid|
-					@record = setup_record(scanid)
+					process_arg(:record, true)
+					process_arg(:scanid, scanid)
 				}
 
 				opts.on('-P', '--[no-]process-tree', "Print the process tree to STDOUT") { |bool|
-					@process_tree = bool
+					proess_arg(:process_tree, bool)
 				}
 
 				opts.on('-M', '--[no-]meminfo_summary', "Print meminfo summary") { |bool|
-					@meminfo_summary = bool
+					process_arg(:meminfo_summary, true)
 				}
 
 				opts.on('-q', '--quiet', "Quiet") {
-					@meminfo_summary = false
-					@process_tree = false
+					process_arg(:quiet)
 				}
 
 				opts.on('-D', '--debug', "Enable debugging output") {
-					@logger.level = Logger::DEBUG
+					process_arg(:debug)
 				}
 
 				opts.on('-h', '--help', "Help") {
@@ -107,10 +176,13 @@ module Memory
 			}
 			optparser.parse!
 
-			# if monitoring make sure record is turned on
-			@record = setup_record(@scanid) if @monitor && @record.empty?
+			load_config
+			save_config
 
-			@data_records = Procfs::JsonRecords.new(jsonf: @record, logger: @logger) unless @record.empty?
+			# if monitoring make sure record is turned on
+			@record = setup_record(@scanid) if @monitor || @record
+
+			@data_records = Procfs::JsonRecords.new(jsonf: @record, logger: @logger) unless @record == false || @record.empty?
 
 		rescue OptionParser::InvalidOption => e
 			@logger.die "#{e.class}: #{e.message}"
@@ -173,10 +245,17 @@ module Memory
 			(section.nil? || section.empty?) ? "" : "%s%s\n%s\n" % [ title, section, sep ]
 		end
 
+		def do_notify(urgent)
+			notify = (urgent || (@last_notification + @wait_notify) > @ts)
+			@last_notification = @ts if notify
+			notify
+		end
+
 		##
 		# sections = Hash with keys title, section
-		def notify(to:, from: nil, sections:{})
+		def notify(to:, from: nil, sections:{}, urgent: false)
 			return if to.nil?
+			return unless do_notify(urgent)
 
 			# delete sections that are nil or empty
 			sections.delete_if { |k, section| section.nil? || section.empty? }
